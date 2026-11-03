@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#121314">
+<title>Home Collection</title>
+<link rel="icon" href="/favicon.ico?v=1" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png?v=1">
+<link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png?v=1">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png?v=1">
+<link rel="manifest" href="/site.webmanifest?v=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Collection">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  --bg:#121314; --s1:#18191b; --s2:#1f2023; --s3:#26282b;
+  --line:#2b2d30; --line2:#3a3c40;
+  --fg:#f5f5f6; --fg2:#a9abb0; --fg3:#74767c;
+  --danger:#f2786f; --ok:#9ad0a6; --warn:#e6c27a;
+  --r:12px; --r-sm:8px;
+  --sans:'Geist',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'Geist Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --t-fast:120ms; --t-med:220ms;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg)}
+body{font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.vh{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+:focus-visible{outline:2px solid var(--fg);outline-offset:2px;border-radius:6px}
+#view:focus,#view:focus-visible{outline:none}
+
+/* header */
+.top{position:sticky;top:0;z-index:20;background:rgba(18,19,20,.96);border-bottom:1px solid var(--line)}
+.top-in{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:24px;padding:0 24px;height:64px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0}
+.brand img{width:28px;height:28px;border-radius:7px}
+.brand b{font-weight:600;font-size:16px;letter-spacing:-.02em}
+.tabs{display:flex;gap:4px;flex:1;min-width:0}
+.tab{padding:8px 14px;border-radius:999px;text-decoration:none;color:var(--fg2);font-weight:500;font-size:14px;white-space:nowrap;transition:color var(--t-fast),background var(--t-fast)}
+.tab:hover{color:var(--fg)}
+.tab[aria-current="page"]{background:var(--fg);color:var(--bg)}
+.tab .n{font-family:var(--mono);font-size:12px;opacity:.6;margin-left:6px}
+.acct{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--fg3)}
+.live i{width:6px;height:6px;border-radius:50%;background:var(--fg3)}
+.live[data-s="live"] i{background:var(--ok)}
+.live[data-s="offline"] i{background:var(--warn)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--line2);background:transparent;cursor:pointer;font-weight:500;font-size:14px;white-space:nowrap;transition:background var(--t-fast),border-color var(--t-fast)}
+.btn:hover{background:var(--s3)}
+.btn.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.btn.primary:hover{background:#dcdcde}
+.btn.danger{border-color:#5a2f2c;color:var(--danger)}
+.btn.danger.solid{background:var(--danger);color:#1a0d0c;border-color:var(--danger)}
+.btn.sm{height:32px;padding:0 12px;font-size:13px}
+.btn[disabled]{opacity:.5;cursor:default}
+.btn svg{width:16px;height:16px}
+.iconbtn{width:38px;height:38px;border-radius:999px;border:1px solid var(--line2);background:transparent;display:inline-grid;place-items:center;cursor:pointer}
+.iconbtn:hover{background:var(--s3)}
+.iconbtn svg{width:18px;height:18px}
+
+/* layout */
+main{max-width:1240px;margin:0 auto;padding:40px 24px 96px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:28px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--fg3);font-weight:500;margin:0 0 6px}
+h1{font-size:40px;line-height:1.05;letter-spacing:-.035em;font-weight:600;margin:0}
+h2{font-size:18px;letter-spacing:-.015em;font-weight:600;margin:0 0 14px}
+.sub{color:var(--fg2);margin:8px 0 0}
+.hint{color:var(--fg3);font-size:13px}
+
+/* vehicle grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px}
+.card{display:block;text-decoration:none;background:var(--s1);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;transition:border-color var(--t-med),transform var(--t-med) var(--ease)}
+.card:hover{border-color:var(--line2);transform:translateY(-2px)}
+.ph{aspect-ratio:16/10;background:var(--s2);position:relative;overflow:hidden}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph .mk{position:absolute;inset:0;display:grid;place-items:center;color:var(--line2);font-weight:700;font-size:56px;letter-spacing:-.05em;user-select:none}
+.ph .st{position:absolute;top:12px;left:12px}
+.card .body{padding:16px 18px 18px}
+.card .yr{font-family:var(--mono);font-size:12px;color:var(--fg3)}
+.card .nm{font-size:19px;font-weight:600;letter-spacing:-.02em;line-height:1.25;margin:2px 0 0}
+.card .nick{color:var(--fg2);font-size:14px}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.facts dt{font-size:11px;color:var(--fg3);text-transform:uppercase;letter-spacing:.08em}
+.facts dd{margin:2px 0 0;font-family:var(--mono);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:999px;font-size:11.5px;font-weight:500;background:var(--s3);color:var(--fg2);border:1px solid var(--line2);white-space:nowrap}
+.chip.light{background:rgba(18,19,20,.8);color:var(--fg);border-color:rgba(255,255,255,.12)}
+
+/* empty */
+.empty{border:1px dashed var(--line2);border-radius:var(--r);padding:56px 24px;text-align:center}
+.empty h2{margin:0 0 6px}
+.empty p{color:var(--fg2);margin:0 0 20px}
+
+/* detail */
+.back{display:inline-flex;align-items:center;gap:6px;color:var(--fg2);text-decoration:none;font-size:14px;margin-bottom:20px}
+.back:hover{color:var(--fg)}
+.hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:32px;align-items:start}
+.hero .ph{border-radius:var(--r);border:1px solid var(--line)}
+.hero h1{font-size:44px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-top:24px}
+.stats div{background:var(--s1);padding:14px 16px}
+.stats dt{font-size:11px;color:var(--fg3);text-transform:uppercase;letter-spacing:.08em}
+.stats dd{margin:4px 0 0;font-family:var(--mono);font-size:18px;letter-spacing:-.02em}
+.stats dd small{font-size:12px;color:var(--fg3)}
+.section{margin-top:48px}
+.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.section-head h2{margin:0}
+.spec{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0;border-top:1px solid var(--line)}
+.spec div{padding:12px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;margin-right:24px}
+.spec dt{color:var(--fg3);font-size:14px}
+.spec dd{margin:0;text-align:right;font-size:14px;overflow-wrap:anywhere}
+.notes{color:var(--fg2);white-space:pre-wrap;margin:0;max-width:72ch}
+
+/* ledger */
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.filters .fld{margin:0;min-width:150px;flex:1 1 150px}
+.filters .fld.grow{flex:2 1 220px}
+.summary{display:flex;gap:24px;flex-wrap:wrap;color:var(--fg2);font-size:14px;margin:0 0 12px}
+.summary b{color:var(--fg);font-family:var(--mono);font-weight:500}
+.rows{border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:104px minmax(0,1fr) 110px 120px;gap:16px;align-items:center;padding:14px 8px;border-bottom:1px solid var(--line);cursor:pointer;width:100%;text-align:left;background:none;border-left:0;border-right:0;border-top:0;border-radius:0}
+.row:hover{background:var(--s1)}
+.row .d{font-family:var(--mono);font-size:13px;color:var(--fg2)}
+.row .t{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .m{font-size:13px;color:var(--fg3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .mi{font-family:var(--mono);font-size:13px;color:var(--fg2);text-align:right}
+.row .a{font-family:var(--mono);text-align:right}
+
+/* costs table */
+.tbl-wrap{position:relative;overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th,td{padding:12px 16px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}
+th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg3);font-weight:500;background:var(--s1)}
+td.n,th.n{text-align:right;font-family:var(--mono)}
+tfoot td{font-weight:600;background:var(--s1);border-bottom:0}
+tbody tr:hover td{background:var(--s1)}
+td a{text-decoration:none}
+td a:hover{text-decoration:underline}
+
+/* panel */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity var(--t-med);z-index:40}
+.scrim.on{opacity:1;pointer-events:auto}
+.panel{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--s1);border-left:1px solid var(--line);z-index:50;transform:translateX(100%);transition:transform var(--t-med) var(--ease);display:flex;flex-direction:column;visibility:hidden}
+.panel.on{transform:none;visibility:visible}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line)}
+.panel-h h2{margin:0;font-size:18px}
+.panel-b{padding:22px;overflow-y:auto;flex:1}
+.panel-f{padding:16px 22px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.panel-f .sp{flex:1}
+
+/* forms */
+fieldset{border:0;padding:0;margin:0 0 24px}
+legend{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--fg3);font-weight:500;margin-bottom:12px;padding:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.fld{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.fld label{font-size:13px;color:var(--fg2);font-weight:500}
+.fld input,.fld select,.fld textarea{background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-sm);padding:9px 12px;min-height:40px;width:100%;transition:border-color var(--t-fast)}
+.fld textarea{min-height:88px;resize:vertical}
+.fld input:hover,.fld select:hover,.fld textarea:hover{border-color:#4a4c51}
+.fld input:focus,.fld select:focus,.fld textarea:focus{outline:none;border-color:var(--fg)}
+.fld.bad input,.fld.bad select,.fld.bad textarea{border-color:var(--danger)}
+.fld .err{color:var(--danger);font-size:12.5px;min-height:0}
+.fld .help{color:var(--fg3);font-size:12.5px}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--fg2);margin:-4px 0 14px}
+.check input{width:16px;height:16px;accent-color:var(--fg)}
+.form-err{background:#2a1716;border:1px solid #5a2f2c;color:#f4c1bc;border-radius:var(--r-sm);padding:10px 12px;font-size:13.5px;margin-bottom:16px}
+.seg{display:flex;background:var(--bg);border:1px solid var(--line2);border-radius:999px;padding:3px;margin-bottom:20px}
+.seg button{flex:1;height:32px;border:0;background:none;border-radius:999px;cursor:pointer;color:var(--fg2);font-weight:500;font-size:13.5px}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.thumb{width:100%;aspect-ratio:16/10;border-radius:var(--r-sm);background:var(--s2);object-fit:cover;display:block;margin-bottom:8px;border:1px solid var(--line)}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:10px 16px;margin:0 0 20px}
+.kv dt{color:var(--fg3);font-size:14px}
+.kv dd{margin:0;font-size:14px;overflow-wrap:anywhere}
+.confirm{background:#231514;border:1px solid #5a2f2c;border-radius:var(--r-sm);padding:14px;margin-top:8px}
+.confirm p{margin:0 0 12px;font-size:14px}
+
+.lock{display:inline-flex;align-items:center;gap:6px;color:var(--fg3);font-size:13px}
+.banner{background:#2a2414;border:1px solid #574a26;color:#eedcae;border-radius:var(--r-sm);padding:10px 14px;font-size:13.5px;margin-bottom:24px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;font-weight:500;opacity:0;pointer-events:none;transition:opacity var(--t-med),transform var(--t-med) var(--ease);z-index:60;max-width:calc(100vw - 32px)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.bad{background:var(--danger);color:#1a0d0c}
+.skel{background:linear-gradient(90deg,var(--s1),var(--s2),var(--s1));background-size:200% 100%;animation:sk 1.2s linear infinite;border-radius:var(--r)}
+@keyframes sk{to{background-position:-200% 0}}
+
+@media (max-width:860px){
+  .hero{grid-template-columns:1fr;gap:24px}
+}
+@media (max-width:720px){
+  .top-in{height:auto;flex-wrap:wrap;padding:12px 16px 0;gap:10px}
+  .brand{flex:1}
+  .live span{display:none}
+  .tabs{order:3;flex-basis:100%;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:4px 16px 10px;scroll-snap-type:x proximity}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{scroll-snap-align:start}
+  main{padding:28px 16px 80px}
+  h1{font-size:32px}
+  .hero h1{font-size:34px}
+  .grid{grid-template-columns:1fr;gap:16px}
+  .row{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"t a" "m d";gap:2px 12px;padding:12px 4px}
+  .row .d{grid-area:d;text-align:right;font-size:12px}
+  .row .tm{grid-area:t;min-width:0}
+  .row .a{grid-area:a}
+  .row .mi{display:none}
+  .two{grid-template-columns:1fr}
+  .kv{grid-template-columns:100px 1fr}
+  .spec div{margin-right:0}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:0ms!important;animation:none!important}
+  .card:hover{transform:none}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="#/cars" aria-label="Home Collection — Cars"><img src="/icons/icon-192.png?v=1" alt=""><b>Home Collection</b></a>
+    <nav class="tabs" aria-label="Sections">
+      <a class="tab" href="#/cars" data-r="cars">Cars<span class="n" id="n-cars"></span></a>
+      <a class="tab" href="#/bikes" data-r="bikes">Bikes<span class="n" id="n-bikes"></span></a>
+      <a class="tab" href="#/ledger" data-r="ledger">Service ledger</a>
+      <a class="tab" href="#/costs" data-r="costs">Costs</a>
+    </nav>
+    <div class="acct">
+      <span class="live" id="live" data-s="loading" title="Database connection"><i></i><span id="live-t">Connecting</span></span>
+      <button class="btn sm" id="acct-btn" type="button">Sign in</button>
+    </div>
+  </div>
+</header>
+
+<main id="view" tabindex="-1"></main>
+
+<div class="scrim" id="scrim"></div>
+<aside class="panel" id="panel" role="dialog" aria-modal="true" aria-labelledby="panel-title">
+  <div class="panel-h"><h2 id="panel-title"></h2>
+    <button class="iconbtn" id="panel-x" type="button" aria-label="Close panel" title="Close (Esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="panel-b" id="panel-b"></div>
+  <div class="panel-f" id="panel-f"></div>
+</aside>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ---------- config ---------- */
+const SUPA_URL = 'https://ftettbbdgivkbamonywf.supabase.co';
+const SUPA_KEY = 'sb_publishable_9jiNbL4oGDjaXOEstTlmzQ_ulmZMw2J';
+const SNAPSHOT = { vehicles: [], records: [] }; // shown if the database can't be reached
+
+const CATEGORIES = {
+  maintenance:'Maintenance', repair:'Repair', modification:'Modification', parts:'Parts',
+  tyres:'Tyres', detailing:'Detailing', inspection:'Inspection', registration:'Registration',
+  insurance:'Insurance', other:'Other'
+};
+const CONFIDENCE = { printed:'Printed invoice', hand:'Handwritten (best read)', est:'Estimated', report:'Report only, no invoice', cf:'Carfax' };
+const STATUS = { owned:'Owned', project:'Project', stored:'Stored', sold:'Sold' };
+
+/* ---------- state ---------- */
+let db = null;
+try { db = window.supabase.createClient(SUPA_URL, SUPA_KEY); } catch (e) { db = null; }
+const S = { vehicles: [], records: [], user: null, editor: false };
+window.live = { state: 'loading', counts: {} };
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const usd0 = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0});
+const usd2 = new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2});
+const money = (v, d) => v == null || v === '' ? '—' : (d ? usd2 : usd0).format(+v);
+const num = v => v == null || v === '' ? '—' : (+v).toLocaleString('en-US');
+const fdate = d => { if (!d) return '—'; const [y,m,dd] = d.split('-'); return `${m}/${dd}/${y}`; };
+const vname = v => v ? [v.year, v.make, v.model].filter(Boolean).join(' ') : 'Unknown vehicle';
+const vshort = v => v ? [v.make, v.model].filter(Boolean).join(' ') : '—';
+const vById = id => S.vehicles.find(v => v.id === id);
+const recsFor = id => S.records.filter(r => r.vehicle_id === id);
+const spent = id => recsFor(id).reduce((a, r) => a + (+r.amount || 0), 0);
+const ICON = {
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  lock:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',
+  back:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>',
+  file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></svg>'
+};
+const lockNote = () => `<span class="lock">${ICON.lock}Sign in to edit</span>`;
+
+function toast(msg, bad) {
+  const t = $('#toast'); t.textContent = msg; t.classList.toggle('bad', !!bad); t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 2800);
+}
+
+/* ---------- data ---------- */
+async function load() {
+  if (!db) { useSnapshot(); return; }
+  try {
+    const [v, r] = await Promise.all([
+      db.from('vehicles').select('*').order('sort_order').order('year', { ascending: false }),
+      db.from('service_records').select('*').order('date', { ascending: false })
+    ]);
+    if (v.error || r.error) throw (v.error || r.error);
+    S.vehicles = v.data; S.records = r.data;
+    setLive('live');
+  } catch (e) { console.warn('Database unreachable, showing snapshot', e); useSnapshot(); }
+  render();
+}
+function useSnapshot() { S.vehicles = SNAPSHOT.vehicles.slice(); S.records = SNAPSHOT.records.slice(); setLive('offline'); render(); }
+function setLive(s) {
+  window.live.state = s;
+  window.live.counts = { vehicles: S.vehicles.length, records: S.records.length };
+  $('#live').dataset.s = s;
+  $('#live-t').textContent = s === 'live' ? 'Live' : s === 'offline' ? 'Offline copy' : 'Connecting';
+}
+
+/* ---------- auth ---------- */
+async function refreshAuth() {
+  if (!db) return;
+  const { data } = await db.auth.getSession();
+  S.user = data.session?.user || null;
+  S.editor = false;
+  if (S.user) {
+    const { data: ed } = await db.from('editors').select('email').eq('email', (S.user.email || '').toLowerCase());
+    S.editor = !!(ed && ed.length);
+  }
+  $('#acct-btn').textContent = S.user ? (S.editor ? 'Editing' : 'Signed in') : 'Sign in';
+  render();
+}
+function authMsg(err) {
+  const m = (err && (err.message || err.error_description || String(err))) || '';
+  if (/invalid login credentials/i.test(m)) return 'That email and password don\'t match. Check both, or choose Create password if this is your first visit.';
+  if (/signups? not allowed/i.test(m)) return 'Sign-ups are switched off for this project. In Supabase, go to Authentication → Sign In / Providers → User Signups and turn on "Allow new users to sign up".';
+  if (/rate limit/i.test(m)) return '"Confirm email" is still on. In Supabase, go to Authentication → Sign In / Providers and turn off "Confirm email", then try again.';
+  if (/database error saving new user/i.test(m)) return 'This email isn\'t on the editor list for this collection. Ask the owner to add it, then try again.';
+  if (/already registered/i.test(m)) return 'This email already has a password. Switch to Sign in.';
+  if (/email not confirmed/i.test(m)) return 'This account is waiting on an email confirmation. Turn off "Confirm email" in Supabase (Authentication → Sign In / Providers), delete this user under Authentication → Users, then create the password again.';
+  if (/password should be at least/i.test(m)) return 'Use at least 6 characters for the password.';
+  if (/failed to fetch|network/i.test(m)) return 'Couldn\'t reach the database. Check your connection and try again.';
+  return m || 'Something went wrong. Try again.';
+}
+function openAccount() {
+  if (S.user) {
+    openPanel('Account', `
+      <dl class="kv"><dt>Email</dt><dd>${esc(S.user.email)}</dd>
+      <dt>Access</dt><dd>${S.editor ? 'Editor — you can add and change records' : 'View only — this email isn\'t on the editor list'}</dd></dl>
+      <form id="pw-form" novalidate>
+        <fieldset><legend>Set a new password</legend>
+          ${field('pw', 'New password', 'password', '', { required:true, help:'At least 6 characters.', ac:'new-password' })}
+        </fieldset>
+        <button class="btn" type="submit">Save password</button>
+      </form>`,
+      `<span class="sp"></span><button class="btn" type="button" id="so">Sign out</button>`);
+    wireForm('#pw-form', { pw: v => v.length < 6 ? 'Use at least 6 characters.' : '' }, async vals => {
+      const { error } = await db.auth.updateUser({ password: vals.pw });
+      if (error) throw new Error(authMsg(error));
+      toast('Password saved'); closePanel();
+    });
+    $('#so').onclick = async () => { await db.auth.signOut(); closePanel(); toast('Signed out'); refreshAuth(); };
+    return;
+  }
+  let mode = 'in';
+  const draw = () => {
+    openPanel(mode === 'in' ? 'Sign in' : 'Create password', `
+      <div class="seg" role="group" aria-label="Sign-in mode">
+        <button type="button" data-m="in" aria-pressed="${mode==='in'}">Sign in</button>
+        <button type="button" data-m="up" aria-pressed="${mode==='up'}">Create password</button>
+      </div>
+      <p class="hint" style="margin:0 0 18px">${mode==='in' ? 'Editors sign in to add and change vehicles and service records. Anyone with the link can view.' : 'First visit? Choose a password for your editor email.'}</p>
+      <form id="auth-form" novalidate>
+        ${field('email', 'Email', 'email', '', { required:true, ac:'email' })}
+        ${field('pw', 'Password', 'password', '', { required:true, help: mode==='up' ? 'At least 6 characters.' : '', ac: mode==='up' ? 'new-password' : 'current-password' })}
+        <button class="btn primary" type="submit" style="width:100%">${mode==='in' ? 'Sign in' : 'Create password'}</button>
+      </form>`, '', { keepFocus: true });
+    document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { mode = b.dataset.m; draw(); });
+    wireForm('#auth-form', {
+      email: v => !v ? 'Enter your email.' : !/^\S+@\S+\.\S+$/.test(v) ? 'Enter a full email, like name@example.com.' : '',
+      pw: v => !v ? 'Enter a password.' : (mode==='up' && v.length < 6) ? 'Use at least 6 characters.' : ''
+    }, async vals => {
+      if (!db) throw new Error('Couldn\'t reach the database. Check your connection and try again.');
+      const email = vals.email.trim().toLowerCase();
+      const res = mode === 'in'
+        ? await db.auth.signInWithPassword({ email, password: vals.pw })
+        : await db.auth.signUp({ email, password: vals.pw });
+      if (res.error) throw new Error(authMsg(res.error));
+      if (mode === 'up' && !res.data.session) throw new Error(authMsg({ message: 'Email not confirmed' }));
+      closePanel(); toast('Signed in'); refreshAuth();
+    });
+  };
+  draw();
+}
+
+/* ---------- panel ---------- */
+let lastFocus = null;
+function openPanel(title, body, foot, opts = {}) {
+  if (!$('#panel').classList.contains('on')) lastFocus = document.activeElement;
+  $('#panel-title').textContent = title;
+  $('#panel-b').innerHTML = body;
+  $('#panel-f').innerHTML = foot || '';
+  $('#panel-f').style.display = foot ? '' : 'none';
+  $('#panel').classList.add('on'); $('#scrim').classList.add('on');
+  $('#panel-b').scrollTop = 0;
+  const first = $('#panel').querySelector('input:not([type=hidden]):not([type=checkbox]),select,textarea');
+  setTimeout(() => (first || $('#panel-x')).focus({ preventScroll: true }), 60);
+}
+function closePanel() {
+  $('#panel').classList.remove('on'); $('#scrim').classList.remove('on');
+  if (lastFocus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
+}
+$('#panel-x').onclick = closePanel; $('#scrim').onclick = closePanel;
+document.addEventListener('keydown', e => {
+  const open = $('#panel').classList.contains('on');
+  if (e.key === 'Escape' && open) { closePanel(); return; }
+  if (open && e.key === 'Tab') {
+    const f = [...$('#panel').querySelectorAll('button,input,select,textarea,a[href]')].filter(x => !x.disabled && x.offsetParent);
+    if (!f.length) return;
+    if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length-1].focus(); }
+    else if (!e.shiftKey && document.activeElement === f[f.length-1]) { e.preventDefault(); f[0].focus(); }
+  }
+  if (!open && !e.metaKey && !e.ctrlKey && !e.altKey && !/input|select|textarea/i.test(document.activeElement.tagName)) {
+    const map = { '1':'cars', '2':'bikes', '3':'ledger', '4':'costs' };
+    if (map[e.key]) location.hash = '#/' + map[e.key];
+  }
+});
+
+/* ---------- forms ---------- */
+function field(name, label, type, value, o = {}) {
+  const id = 'f-' + name;
+  let input;
+  if (type === 'select') input = `<select id="${id}" name="${name}">${o.options.map(([v, t]) => `<option value="${esc(v)}"${String(v) === String(value ?? '') ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+  else if (type === 'textarea') input = `<textarea id="${id}" name="${name}">${esc(value)}</textarea>`;
+  else input = `<input id="${id}" name="${name}" type="${type}" value="${esc(value)}"${o.ac ? ` autocomplete="${o.ac}"` : ''}${o.step ? ` step="${o.step}"` : ''}${o.inputmode ? ` inputmode="${o.inputmode}"` : ''}${o.accept ? ` accept="${o.accept}"` : ''}${o.ph ? ` placeholder="${esc(o.ph)}"` : ''}>`;
+  return `<div class="fld" data-f="${name}"><label for="${id}">${esc(label)}${o.required ? '' : ' <span class="hint">(optional)</span>'}</label>${input}${o.help ? `<span class="help">${esc(o.help)}</span>` : ''}<span class="err" id="${id}-err" aria-live="polite"></span></div>`;
+}
+function wireForm(sel, rules, onSubmit) {
+  const form = $(sel); if (!form) return;
+  const touched = new Set();
+  const check = (name, show) => {
+    const el = form.elements[name]; if (!el || !rules[name]) return '';
+    const msg = rules[name](el.type === 'file' ? el.files : el.value, form);
+    const box = form.querySelector(`[data-f="${name}"]`);
+    if (show) { box.classList.toggle('bad', !!msg); box.querySelector('.err').textContent = msg; el.setAttribute('aria-invalid', msg ? 'true' : 'false'); }
+    return msg;
+  };
+  form.addEventListener('input', e => { const n = e.target.name; if (!n) return; touched.add(n); const box = form.querySelector(`[data-f="${n}"]`); if (box && box.classList.contains('bad')) check(n, true); });
+  form.addEventListener('focusout', e => { const n = e.target.name; if (n && touched.has(n)) check(n, true); });
+  const submit = async e => {
+    e.preventDefault();
+    const bad = Object.keys(rules).filter(n => check(n, true));
+    form.querySelector('.form-err')?.remove();
+    if (bad.length) { form.elements[bad[0]].focus(); return; }
+    const btns = [...document.querySelectorAll('#panel button[type=submit], #panel [data-submit]')];
+    btns.forEach(b => b.disabled = true);
+    try {
+      const vals = Object.fromEntries([...form.elements].filter(x => x.name).map(x => [x.name, x.type === 'checkbox' ? x.checked : x.type === 'file' ? x.files : x.value]));
+      await onSubmit(vals);
+    } catch (err) {
+      form.insertAdjacentHTML('afterbegin', `<div class="form-err" role="alert">${esc(err.message || err)}</div>`);
+      $('#panel-b').scrollTop = 0;
+    } finally { btns.forEach(b => b.disabled = false); }
+  };
+  form.addEventListener('submit', submit);
+  document.querySelectorAll('#panel [data-submit]').forEach(b => b.onclick = () => form.requestSubmit());
+}
+const nz = v => (v === '' || v == null) ? null : v;
+const nInt = v => (v === '' || v == null) ? null : parseInt(String(v).replace(/[^\d]/g, ''), 10);
+const nMoney = v => (v === '' || v == null) ? null : parseFloat(String(v).replace(/[^\d.]/g, ''));
+const intRule = (label) => v => v && !/^[\d,]+$/.test(v.trim()) ? `${label} should be a whole number, like 45,200.` : '';
+const moneyRule = (label) => v => v && !/^\$?[\d,]*\.?\d{0,2}$/.test(v.trim()) ? `${label} should be an amount, like 1,250 or 1250.50.` : '';
+
+/* ---------- uploads ---------- */
+async function shrinkImage(file, max = 1800) {
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return file;
+  const img = await createImageBitmap(file);
+  const k = Math.min(1, max / Math.max(img.width, img.height));
+  const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.86));
+  return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
+}
+async function upload(file, prefix) {
+  const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+  const path = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+  const { error } = await db.storage.from('media').upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw new Error('The file didn\'t upload: ' + error.message + '. Try again, or save without it.');
+  return db.storage.from('media').getPublicUrl(path).data.publicUrl;
+}
+
+/* ---------- views ---------- */
+function photo(v, eager) {
+  const mk = esc(((v.make || '?')[0] + (v.model || '')[0] || '').toUpperCase());
+  return `<div class="ph">${v.photo_url ? `<img src="${esc(v.photo_url)}" alt="${esc(vname(v))}" ${eager ? '' : 'loading="lazy"'}>` : `<div class="mk" aria-hidden="true">${mk}</div>`}${v.status && v.status !== 'owned' ? `<span class="st chip light">${esc(STATUS[v.status])}</span>` : ''}</div>`;
+}
+function viewList(kind) {
+  const list = S.vehicles.filter(v => v.kind === kind);
+  const word = kind === 'car' ? 'car' : 'bike', Word = kind === 'car' ? 'Cars' : 'Bikes';
+  const add = S.editor ? `<button class="btn primary" type="button" data-add-v="${kind}">${ICON.plus}Add ${word}</button>` : (S.user ? '' : lockNote());
+  const totalPaid = list.reduce((a, v) => a + (+v.purchase_price || 0), 0);
+  let html = `<div class="head"><div><p class="eyebrow">The collection</p><h1>${Word}</h1>
+    <p class="sub">${list.length ? `${list.length} ${list.length === 1 ? word : word + 's'}${totalPaid ? ` · ${money(totalPaid)} purchase value` : ''}` : `No ${word}s yet`}</p></div>${add}</div>`;
+  if (window.live.state === 'loading') return html + `<div class="grid">${'<div class="skel" style="height:330px"></div>'.repeat(3)}</div>`;
+  if (!list.length) return html + `<div class="empty"><h2>Add your first ${word}</h2><p>Each ${word} gets a card with its photo and key facts, and its own page for specs, purchase details and service history.</p>${S.editor ? `<button class="btn primary" type="button" data-add-v="${kind}">${ICON.plus}Add ${word}</button>` : `<button class="btn" type="button" data-signin>Sign in to add ${word}s</button>`}</div>`;
+  return html + `<div class="grid">${list.map(v => `
+    <a class="card" href="#/vehicle/${v.id}">
+      ${photo(v)}
+      <div class="body">
+        <div class="yr">${esc(v.year || '')}${v.colour ? ' · ' + esc(v.colour) : ''}</div>
+        <div class="nm">${esc(vshort(v))}${v.trim_level ? ' ' + esc(v.trim_level) : ''}</div>
+        ${v.nickname ? `<div class="nick">${esc(v.nickname)}</div>` : ''}
+        <dl class="facts">
+          <div><dt>Odometer</dt><dd>${v.odometer != null ? num(v.odometer) + ' ' + v.odometer_unit : '—'}</dd></div>
+          <div><dt>${v.status === 'sold' ? 'Sold' : 'Bought'}</dt><dd>${v.status === 'sold' ? fdate(v.sold_date) : (v.purchase_date ? fdate(v.purchase_date) : '—')}</dd></div>
+          <div><dt>Records</dt><dd>${recsFor(v.id).length}</dd></div>
+        </dl>
+      </div>
+    </a>`).join('')}</div>`;
+}
+function viewVehicle(id) {
+  const v = vById(id);
+  if (!v) return `<a class="back" href="#/cars">${ICON.back}Back to cars</a><div class="empty"><h2>This vehicle isn't here</h2><p>It may have been deleted, or the link is wrong.</p><a class="btn" href="#/cars">Go to cars</a></div>`;
+  const recs = recsFor(id), sp = spent(id), back = v.kind === 'car' ? 'cars' : 'bikes';
+  const owned = v.purchase_date ? Math.max(0, Math.round((new Date(v.sold_date || Date.now()) - new Date(v.purchase_date)) / 864e5)) : null;
+  const spec = [
+    ['Make', v.make], ['Model', v.model], ['Trim', v.trim_level], ['Year', v.year], ['Colour', v.colour], ['VIN', v.vin, 1],
+    ['Engine', v.engine], ['Transmission', v.transmission], ['Drivetrain', v.drivetrain], ['Power', v.power], ['Plate', v.plate], ['Kept at', v.location]
+  ].filter(x => x[1] != null && x[1] !== '');
+  const own = [
+    ['Purchased', fdate(v.purchase_date)], ['Price paid', money(v.purchase_price, 0), 1], ['Bought from', v.purchased_from],
+    ['Co-owners', v.co_owners], ['Status', STATUS[v.status]],
+    ...(v.status === 'sold' ? [['Sold', fdate(v.sold_date)], ['Sale price', money(v.sold_price), 1]] : []),
+    ['Odometer', v.odometer != null ? `${num(v.odometer)} ${v.odometer_unit}${v.odometer_date ? ' (' + fdate(v.odometer_date) + ')' : ''}` : null, 1]
+  ].filter(x => x[1] != null && x[1] !== '' && x[1] !== '—');
+  const dl = rows => rows.length ? `<dl class="spec">${rows.map(([k, val, m]) => `<div><dt>${esc(k)}</dt><dd${m ? ' class="mono"' : ''}>${esc(val)}</dd></div>`).join('')}</dl>` : `<p class="hint">Nothing recorded yet.</p>`;
+  return `<a class="back" href="#/${back}">${ICON.back}${back === 'cars' ? 'Cars' : 'Bikes'}</a>
+    <div class="hero">
+      ${photo(v, true)}
+      <div>
+        <p class="eyebrow">${esc(v.year || '')} ${v.kind === 'car' ? 'Car' : 'Motorcycle'}</p>
+        <h1>${esc(vshort(v))}${v.trim_level ? ' ' + esc(v.trim_level) : ''}</h1>
+        ${v.nickname ? `<p class="sub">${esc(v.nickname)}</p>` : ''}
+        <dl class="stats">
+          <div><dt>Odometer</dt><dd>${v.odometer != null ? num(v.odometer) + ` <small>${v.odometer_unit}</small>` : '—'}</dd></div>
+          <div><dt>Paid</dt><dd>${money(v.purchase_price)}</dd></div>
+          <div><dt>Service & parts</dt><dd>${money(sp)}</dd></div>
+          <div><dt>Total in</dt><dd>${money((+v.purchase_price || 0) + sp)}</dd></div>
+          <div><dt>Owned</dt><dd>${owned != null ? (owned >= 365 ? (owned / 365).toFixed(1) + ' <small>yrs</small>' : owned + ' <small>days</small>') : '—'}</dd></div>
+          <div><dt>Records</dt><dd>${recs.length}</dd></div>
+        </dl>
+        <div class="actions">${S.editor ? `<button class="btn primary" type="button" data-add-r="${v.id}">${ICON.plus}Add service</button><button class="btn" type="button" data-edit-v="${v.id}">Edit details</button>` : (S.user ? '' : lockNote())}</div>
+      </div>
+    </div>
+    <div class="section"><h2>Specifications</h2>${dl(spec)}</div>
+    <div class="section"><h2>Ownership</h2>${dl(own)}</div>
+    ${v.notes ? `<div class="section"><h2>Notes</h2><p class="notes">${esc(v.notes)}</p></div>` : ''}
+    <div class="section">
+      <div class="section-head"><h2>Service history</h2>${recs.length ? `<span class="hint">${recs.length} record${recs.length === 1 ? '' : 's'} · ${money(sp, 1)}</span>` : ''}</div>
+      ${recs.length ? rowsHtml(recs, false) : `<div class="empty"><h2>No service records yet</h2><p>Add work as it happens, or send invoices and they'll be entered here.</p>${S.editor ? `<button class="btn primary" type="button" data-add-r="${v.id}">${ICON.plus}Add service</button>` : ''}</div>`}
+    </div>`;
+}
+function rowsHtml(recs, showVehicle) {
+  return `<div class="rows">${recs.map(r => {
+    const v = vById(r.vehicle_id);
+    const meta = [showVehicle ? vname(v) : null, r.shop, CATEGORIES[r.category]].filter(Boolean).join(' · ');
+    return `<button class="row" type="button" data-rec="${r.id}">
+      <span class="d">${fdate(r.date)}</span>
+      <span class="tm"><span class="t" style="display:block">${esc(r.title)}${r.invoice_url ? ' <span class="hint" title="Invoice attached">· invoice</span>' : ''}</span><span class="m" style="display:block">${esc(meta)}</span></span>
+      <span class="mi">${r.mileage != null ? (r.mileage_approx ? '≈' : '') + num(r.mileage) : ''}</span>
+      <span class="a">${r.amount != null ? money(r.amount, 1) : '—'}${r.confidence === 'est' ? '*' : ''}</span>
+    </button>`; }).join('')}</div>`;
+}
+const LF = { v: '', c: '', y: '', q: '' };
+function viewLedger() {
+  const years = [...new Set(S.records.map(r => r.date.slice(0, 4)))].sort().reverse();
+  const head = `<div class="head"><div><p class="eyebrow">Everything done, every vehicle</p><h1>Service ledger</h1></div>
+    ${S.editor ? `<button class="btn primary" type="button" data-add-r="">${ICON.plus}Add service</button>` : (S.user ? '' : lockNote())}</div>`;
+  if (window.live.state === 'loading') return head + '<div class="skel" style="height:240px"></div>';
+  if (!S.records.length) return head + `<div class="empty"><h2>No service records yet</h2><p>${S.vehicles.length ? 'Add work as it happens, or send invoices and they\'ll be entered here.' : 'Add a vehicle first, then its service records will appear here.'}</p>${S.editor ? (S.vehicles.length ? `<button class="btn primary" type="button" data-add-r="">${ICON.plus}Add service</button>` : `<a class="btn primary" href="#/cars">Go to cars</a>`) : `<button class="btn" type="button" data-signin>Sign in to add records</button>`}</div>`;
+  const q = LF.q.trim().toLowerCase();
+  const list = S.records.filter(r => (!LF.v || r.vehicle_id === LF.v) && (!LF.c || r.category === LF.c) && (!LF.y || r.date.startsWith(LF.y)) &&
+    (!q || [r.title, r.items, r.shop, r.notes, vname(vById(r.vehicle_id))].join(' ').toLowerCase().includes(q)));
+  const total = list.reduce((a, r) => a + (+r.amount || 0), 0);
+  return head + `<div class="filters">
+      <div class="fld grow"><label for="lf-q">Search</label><input id="lf-q" type="search" value="${esc(LF.q)}" placeholder="Oil, brakes, shop name…"></div>
+      <div class="fld"><label for="lf-v">Vehicle</label><select id="lf-v"><option value="">All vehicles</option>${S.vehicles.map(v => `<option value="${v.id}"${LF.v === v.id ? ' selected' : ''}>${esc(vname(v))}</option>`).join('')}</select></div>
+      <div class="fld"><label for="lf-c">Category</label><select id="lf-c"><option value="">All categories</option>${Object.entries(CATEGORIES).map(([k, t]) => `<option value="${k}"${LF.c === k ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
+      <div class="fld"><label for="lf-y">Year</label><select id="lf-y"><option value="">All years</option>${years.map(y => `<option${LF.y === y ? ' selected' : ''}>${y}</option>`).join('')}</select></div>
+    </div>
+    <p class="summary"><span><b>${list.length}</b> record${list.length === 1 ? '' : 's'}</span><span>Total <b>${money(total, 1)}</b></span>${list.some(r => r.confidence === 'est') ? '<span class="hint">* estimated, not from a receipt</span>' : ''}</p>
+    ${list.length ? rowsHtml(list, true) : `<div class="empty"><h2>No records match</h2><p>Try a different search or clear the filters.</p><button class="btn" type="button" id="lf-clear">Clear filters</button></div>`}`;
+}
+function viewCosts() {
+  const head = `<div class="head"><div><p class="eyebrow">What the collection has cost</p><h1>Costs</h1></div></div>`;
+  if (window.live.state === 'loading') return head + '<div class="skel" style="height:240px"></div>';
+  if (!S.vehicles.length) return head + `<div class="empty"><h2>Nothing to total yet</h2><p>Purchase prices and service spend for each vehicle will add up here.</p><a class="btn" href="#/cars">Go to cars</a></div>`;
+  const rows = S.vehicles.map(v => ({ v, p: +v.purchase_price || 0, s: spent(v.id), n: recsFor(v.id).length, last: recsFor(v.id)[0]?.date }));
+  const T = rows.reduce((a, r) => ({ p: a.p + r.p, s: a.s + r.s, n: a.n + r.n }), { p: 0, s: 0, n: 0 });
+  const byCat = Object.keys(CATEGORIES).map(k => [k, S.records.filter(r => r.category === k).reduce((a, r) => a + (+r.amount || 0), 0), S.records.filter(r => r.category === k).length]).filter(x => x[2]);
+  return head + `
+    <dl class="stats" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:0 0 32px">
+      <div><dt>Purchase value</dt><dd>${money(T.p)}</dd></div>
+      <div><dt>Service & parts</dt><dd>${money(T.s)}</dd></div>
+      <div><dt>Total in</dt><dd>${money(T.p + T.s)}</dd></div>
+      <div><dt>Vehicles</dt><dd>${S.vehicles.length}</dd></div>
+    </dl>
+    <h2>By vehicle</h2>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th scope="col">Vehicle</th><th scope="col" class="n">Purchase</th><th scope="col" class="n">Service & parts</th><th scope="col" class="n">Total in</th><th scope="col" class="n">Records</th><th scope="col" class="n">Last service</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td><a href="#/vehicle/${r.v.id}">${esc(vname(r.v))}</a></td><td class="n">${money(r.p || null)}</td><td class="n">${money(r.s)}</td><td class="n">${money(r.p + r.s)}</td><td class="n">${r.n}</td><td class="n">${fdate(r.last)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>All vehicles</td><td class="n">${money(T.p)}</td><td class="n">${money(T.s)}</td><td class="n">${money(T.p + T.s)}</td><td class="n">${T.n}</td><td class="n"></td></tr></tfoot>
+    </table></div>
+    ${byCat.length ? `<div class="section"><h2>By category</h2><div class="tbl-wrap"><table>
+      <thead><tr><th scope="col">Category</th><th scope="col" class="n">Records</th><th scope="col" class="n">Spent</th><th scope="col" class="n">Share</th></tr></thead>
+      <tbody>${byCat.sort((a, b) => b[1] - a[1]).map(([k, s, n]) => `<tr><td>${CATEGORIES[k]}</td><td class="n">${n}</td><td class="n">${money(s, 1)}</td><td class="n">${T.s ? Math.round(s / T.s * 100) + '%' : '—'}</td></tr>`).join('')}</tbody>
+    </table></div></div>` : ''}`;
+}
+
+/* ---------- vehicle form ---------- */
+function openVehicleForm(v, kind) {
+  const isNew = !v; v = v || { kind, odometer_unit: kind === 'bike' ? 'mi' : 'mi', status: 'owned' };
+  const word = v.kind === 'car' ? 'car' : 'bike';
+  openPanel(isNew ? `Add ${word}` : 'Edit details', `
+    <form id="v-form" novalidate>
+      <fieldset><legend>Photo</legend>
+        ${v.photo_url ? `<img class="thumb" src="${esc(v.photo_url)}" alt="">` : ''}
+        ${field('photo', v.photo_url ? 'Replace photo' : 'Photo', 'file', '', { accept: 'image/*', help: 'A side or 3/4 view works best on the card.' })}
+      </fieldset>
+      <fieldset><legend>Basics</legend>
+        ${field('kind', 'Type', 'select', v.kind, { required: true, options: [['car', 'Car'], ['bike', 'Motorcycle']] })}
+        <div class="two">${field('year', 'Year', 'text', v.year, { inputmode: 'numeric', required: true })}${field('make', 'Make', 'text', v.make, { required: true, ph: 'BMW' })}</div>
+        <div class="two">${field('model', 'Model', 'text', v.model, { required: true, ph: 'M3' })}${field('trim_level', 'Trim or version', 'text', v.trim_level)}</div>
+        <div class="two">${field('nickname', 'Nickname', 'text', v.nickname)}${field('colour', 'Colour', 'text', v.colour)}</div>
+      </fieldset>
+      <fieldset><legend>Specifications</legend>
+        ${field('vin', v.kind === 'bike' ? 'VIN / frame number' : 'VIN', 'text', v.vin, { help: '17 characters for most vehicles from 1981 on.' })}
+        <div class="two">${field('engine', 'Engine', 'text', v.engine)}${field('power', 'Power', 'text', v.power, { ph: '280 hp' })}</div>
+        <div class="two">${field('transmission', 'Transmission', 'text', v.transmission, { ph: '6-speed manual' })}${field('drivetrain', 'Drivetrain', 'text', v.drivetrain, { ph: 'RWD' })}</div>
+        <div class="two">${field('plate', 'Plate', 'text', v.plate)}${field('location', 'Kept at', 'text', v.location)}</div>
+      </fieldset>
+      <fieldset><legend>Mileage</legend>
+        <div class="two">${field('odometer', 'Current odometer', 'text', v.odometer != null ? num(v.odometer) : '', { inputmode: 'numeric' })}${field('odometer_unit', 'Unit', 'select', v.odometer_unit, { required: true, options: [['mi', 'Miles'], ['km', 'Kilometres']] })}</div>
+        ${field('odometer_date', 'Reading taken on', 'date', v.odometer_date || (isNew ? new Date().toISOString().slice(0, 10) : ''))}
+      </fieldset>
+      <fieldset><legend>Ownership</legend>
+        <div class="two">${field('purchase_date', 'Purchase date', 'date', v.purchase_date)}${field('purchase_price', 'Purchase price (USD)', 'text', v.purchase_price ?? '', { inputmode: 'decimal' })}</div>
+        ${field('purchased_from', 'Bought from', 'text', v.purchased_from, { ph: 'Dealer, private sale, auction…' })}
+        ${field('co_owners', 'Co-owners', 'text', v.co_owners, { help: 'Leave blank if it\'s only yours.' })}
+        ${field('status', 'Status', 'select', v.status, { required: true, options: Object.entries(STATUS) })}
+        <div class="two" id="sold-f" ${v.status === 'sold' ? '' : 'hidden'}>${field('sold_date', 'Sold on', 'date', v.sold_date)}${field('sold_price', 'Sale price (USD)', 'text', v.sold_price ?? '', { inputmode: 'decimal' })}</div>
+      </fieldset>
+      <fieldset><legend>Notes</legend>${field('notes', 'Notes', 'textarea', v.notes)}</fieldset>
+      ${!isNew ? `<fieldset><legend>Delete</legend><div id="del-box"><button class="btn danger" type="button" id="del-v">Delete this ${word}…</button></div></fieldset>` : ''}
+    </form>`,
+    `<button class="btn" type="button" id="cancel">Cancel</button><button class="btn primary" type="button" data-submit>${isNew ? `Add ${word}` : 'Save changes'}</button>`);
+  $('#cancel').onclick = closePanel;
+  $('#f-status').onchange = e => $('#sold-f').hidden = e.target.value !== 'sold';
+  if (!isNew) $('#del-v').onclick = () => {
+    $('#del-box').innerHTML = `<div class="confirm"><p>Delete <b>${esc(vname(v))}</b> and its ${recsFor(v.id).length} service record${recsFor(v.id).length === 1 ? '' : 's'}? This can't be undone.</p>
+      <button class="btn" type="button" id="del-no">Keep it</button> <button class="btn danger solid" type="button" id="del-yes">Delete ${esc(vshort(v))}</button></div>`;
+    $('#del-no').onclick = () => openVehicleForm(v);
+    $('#del-yes').onclick = async () => {
+      const { error } = await db.from('vehicles').delete().eq('id', v.id);
+      if (error) return toast('Couldn\'t delete: ' + error.message, true);
+      S.vehicles = S.vehicles.filter(x => x.id !== v.id); S.records = S.records.filter(r => r.vehicle_id !== v.id);
+      closePanel(); toast(`Deleted ${vshort(v)}`); location.hash = '#/' + (v.kind === 'car' ? 'cars' : 'bikes'); render();
+    };
+  };
+  const yearNow = new Date().getFullYear() + 1;
+  wireForm('#v-form', {
+    year: x => !x ? 'Enter the model year.' : !/^\d{4}$/.test(x.trim()) || +x < 1885 || +x > yearNow ? `Enter a 4-digit year between 1885 and ${yearNow}.` : '',
+    make: x => !x.trim() ? 'Enter the make, like BMW or Ducati.' : '',
+    model: x => !x.trim() ? 'Enter the model.' : '',
+    odometer: intRule('Odometer'),
+    purchase_price: moneyRule('Purchase price'),
+    sold_price: moneyRule('Sale price'),
+    photo: f => f && f[0] && !/^image\//.test(f[0].type) ? 'Choose an image file (JPG, PNG or HEIC).' : ''
+  }, async f => {
+    const id = v.id || crypto.randomUUID();
+    const row = {
+      id, kind: f.kind, year: +f.year, make: f.make.trim(), model: f.model.trim(), trim_level: nz(f.trim_level.trim()), nickname: nz(f.nickname.trim()),
+      colour: nz(f.colour.trim()), vin: nz(f.vin.trim().toUpperCase()), engine: nz(f.engine.trim()), power: nz(f.power.trim()),
+      transmission: nz(f.transmission.trim()), drivetrain: nz(f.drivetrain.trim()), plate: nz(f.plate.trim()), location: nz(f.location.trim()),
+      odometer: nInt(f.odometer), odometer_unit: f.odometer_unit, odometer_date: nz(f.odometer_date),
+      purchase_date: nz(f.purchase_date), purchase_price: nMoney(f.purchase_price), purchased_from: nz(f.purchased_from.trim()),
+      co_owners: nz(f.co_owners.trim()), status: f.status, sold_date: f.status === 'sold' ? nz(f.sold_date) : null,
+      sold_price: f.status === 'sold' ? nMoney(f.sold_price) : null, notes: nz(f.notes.trim())
+    };
+    if (f.photo && f.photo[0]) row.photo_url = await upload(await shrinkImage(f.photo[0]), `vehicles/${id}`);
+    const res = isNew ? await db.from('vehicles').insert(row).select().single() : await db.from('vehicles').update(row).eq('id', id).select().single();
+    if (res.error) throw new Error('Couldn\'t save: ' + res.error.message);
+    S.vehicles = isNew ? [...S.vehicles, res.data] : S.vehicles.map(x => x.id === id ? res.data : x);
+    closePanel(); toast(isNew ? `Added ${vshort(res.data)}` : 'Saved');
+    if (isNew) location.hash = '#/vehicle/' + id; render();
+  });
+}
+
+/* ---------- service form ---------- */
+function openRecord(r) {
+  const v = vById(r.vehicle_id);
+  openPanel(r.title, `
+    <dl class="kv">
+      <dt>Vehicle</dt><dd><a href="#/vehicle/${r.vehicle_id}" data-close>${esc(vname(v))}</a></dd>
+      <dt>Date</dt><dd class="mono">${fdate(r.date)}</dd>
+      ${r.mileage != null ? `<dt>Mileage</dt><dd class="mono">${r.mileage_approx ? '≈ ' : ''}${num(r.mileage)} ${v?.odometer_unit || 'mi'}</dd>` : ''}
+      ${r.shop ? `<dt>Shop</dt><dd>${esc(r.shop)}</dd>` : ''}
+      <dt>Category</dt><dd>${CATEGORIES[r.category]}</dd>
+      <dt>Amount</dt><dd class="mono">${money(r.amount, 1)}</dd>
+      <dt>Source</dt><dd>${CONFIDENCE[r.confidence]}</dd>
+    </dl>
+    ${r.items ? `<h2 style="font-size:14px">Work done</h2><p class="notes" style="margin-bottom:20px">${esc(r.items)}</p>` : ''}
+    ${r.notes ? `<h2 style="font-size:14px">Notes</h2><p class="notes" style="margin-bottom:20px">${esc(r.notes)}</p>` : ''}
+    ${r.invoice_url ? `<a class="btn" href="${esc(r.invoice_url)}" target="_blank" rel="noopener">${ICON.file}Open invoice</a>` : ''}
+    ${S.editor ? '' : (S.user ? '' : `<p style="margin-top:20px">${lockNote()}</p>`)}`,
+    S.editor ? `<span class="sp"></span><button class="btn" type="button" id="r-edit">Edit</button>` : '');
+  $('#panel-b').querySelectorAll('[data-close]').forEach(a => a.onclick = closePanel);
+  if (S.editor) $('#r-edit').onclick = () => openRecordForm(r);
+}
+function openRecordForm(r, vehicleId) {
+  const isNew = !r;
+  if (!S.vehicles.length) { toast('Add a vehicle first', true); return; }
+  r = r || { vehicle_id: vehicleId || '', date: new Date().toISOString().slice(0, 10), category: 'maintenance', confidence: 'printed' };
+  openPanel(isNew ? 'Add service' : 'Edit service', `
+    <form id="r-form" novalidate>
+      ${field('vehicle_id', 'Vehicle', 'select', r.vehicle_id, { required: true, options: [['', 'Choose a vehicle'], ...S.vehicles.map(v => [v.id, vname(v)])] })}
+      ${field('title', 'What was done', 'text', r.title, { required: true, ph: 'Oil and filter change' })}
+      <div class="two">${field('date', 'Date', 'date', r.date, { required: true })}${field('category', 'Category', 'select', r.category, { required: true, options: Object.entries(CATEGORIES) })}</div>
+      <div class="two">${field('mileage', 'Mileage', 'text', r.mileage != null ? num(r.mileage) : '', { inputmode: 'numeric' })}${field('amount', 'Amount (USD)', 'text', r.amount ?? '', { inputmode: 'decimal' })}</div>
+      <label class="check"><input type="checkbox" name="mileage_approx" ${r.mileage_approx ? 'checked' : ''}> Mileage is approximate</label>
+      ${field('shop', 'Shop or who did it', 'text', r.shop, { ph: 'Dealer, independent shop, DIY…' })}
+      ${field('items', 'Parts and line items', 'textarea', r.items, { help: 'One per line works well.' })}
+      ${field('confidence', 'Where the figures come from', 'select', r.confidence, { required: true, options: Object.entries(CONFIDENCE) })}
+      ${r.invoice_url ? `<p style="margin:0 0 8px"><a href="${esc(r.invoice_url)}" target="_blank" rel="noopener">Current invoice</a></p>` : ''}
+      ${field('invoice', r.invoice_url ? 'Replace invoice' : 'Invoice', 'file', '', { accept: 'image/*,application/pdf', help: 'Photo or PDF.' })}
+      ${field('notes', 'Notes', 'textarea', r.notes)}
+      ${!isNew ? `<fieldset style="margin-top:8px"><legend>Delete</legend><div id="del-box"><button class="btn danger" type="button" id="del-r">Delete this record…</button></div></fieldset>` : ''}
+    </form>`,
+    `<button class="btn" type="button" id="cancel">Cancel</button><button class="btn primary" type="button" data-submit>${isNew ? 'Add record' : 'Save changes'}</button>`);
+  $('#cancel').onclick = () => isNew ? closePanel() : openRecord(r);
+  if (!isNew) $('#del-r').onclick = () => {
+    $('#del-box').innerHTML = `<div class="confirm"><p>Delete <b>${esc(r.title)}</b> from ${fdate(r.date)}? This can't be undone.</p>
+      <button class="btn" type="button" id="del-no">Keep it</button> <button class="btn danger solid" type="button" id="del-yes">Delete record</button></div>`;
+    $('#del-no').onclick = () => openRecordForm(r);
+    $('#del-yes').onclick = async () => {
+      const { error } = await db.from('service_records').delete().eq('id', r.id);
+      if (error) return toast('Couldn\'t delete: ' + error.message, true);
+      S.records = S.records.filter(x => x.id !== r.id); closePanel(); toast('Record deleted'); render();
+    };
+  };
+  wireForm('#r-form', {
+    vehicle_id: x => !x ? 'Choose which vehicle this was for.' : '',
+    title: x => !x.trim() ? 'Describe the work in a few words, like "Brake pads and rotors".' : '',
+    date: x => !x ? 'Enter the date the work was done.' : '',
+    mileage: intRule('Mileage'),
+    amount: moneyRule('Amount'),
+    invoice: f => f && f[0] && !/^image\/|application\/pdf/.test(f[0].type) ? 'Choose a photo or a PDF.' : ''
+  }, async f => {
+    const row = {
+      vehicle_id: f.vehicle_id, title: f.title.trim(), date: f.date, category: f.category, mileage: nInt(f.mileage), mileage_approx: !!f.mileage_approx,
+      amount: nMoney(f.amount), shop: nz(f.shop.trim()), items: nz(f.items.trim()), confidence: f.confidence, notes: nz(f.notes.trim())
+    };
+    if (f.invoice && f.invoice[0]) row.invoice_url = await upload(await shrinkImage(f.invoice[0], 2400), `invoices/${f.vehicle_id}`);
+    const res = isNew ? await db.from('service_records').insert(row).select().single() : await db.from('service_records').update(row).eq('id', r.id).select().single();
+    if (res.error) throw new Error('Couldn\'t save: ' + res.error.message);
+    S.records = (isNew ? [res.data, ...S.records] : S.records.map(x => x.id === r.id ? res.data : x)).sort((a, b) => b.date.localeCompare(a.date));
+    closePanel(); toast(isNew ? 'Record added' : 'Saved'); render();
+  });
+}
+
+/* ---------- router ---------- */
+function current() { const h = location.hash.replace(/^#\/?/, '') || 'cars'; const [a, b] = h.split('/'); return { a, b }; }
+function render() {
+  const { a, b } = current();
+  const tab = a === 'vehicle' ? (vById(b)?.kind === 'bike' ? 'bikes' : 'cars') : a;
+  document.querySelectorAll('.tab').forEach(t => t.toggleAttribute('aria-current', false) || (t.dataset.r === tab && t.setAttribute('aria-current', 'page')));
+  $('#n-cars').textContent = S.vehicles.filter(v => v.kind === 'car').length || '';
+  $('#n-bikes').textContent = S.vehicles.filter(v => v.kind === 'bike').length || '';
+  const banner = window.live.state === 'offline' ? `<div class="banner">Couldn't reach the database, so this is the saved copy. Changes are paused until the connection is back.</div>` : '';
+  let html;
+  if (a === 'bikes') html = viewList('bike');
+  else if (a === 'ledger') html = viewLedger();
+  else if (a === 'costs') html = viewCosts();
+  else if (a === 'vehicle') html = viewVehicle(b);
+  else html = viewList('car');
+  const titles = { cars: 'Cars', bikes: 'Bikes', ledger: 'Service ledger', costs: 'Costs' };
+  document.title = (a === 'vehicle' ? vname(vById(b)) : titles[a] || 'Cars') + ' · Home Collection';
+  $('#view').innerHTML = banner + html;
+  wireView();
+}
+function wireView() {
+  const V = $('#view');
+  V.querySelectorAll('[data-add-v]').forEach(b => b.onclick = () => openVehicleForm(null, b.dataset.addV));
+  V.querySelectorAll('[data-edit-v]').forEach(b => b.onclick = () => openVehicleForm(vById(b.dataset.editV)));
+  V.querySelectorAll('[data-add-r]').forEach(b => b.onclick = () => openRecordForm(null, b.dataset.addR));
+  V.querySelectorAll('[data-rec]').forEach(b => b.onclick = () => openRecord(S.records.find(r => r.id === b.dataset.rec)));
+  V.querySelectorAll('[data-signin]').forEach(b => b.onclick = openAccount);
+  const keep = (id, k) => { const el = $(id); if (!el) return; el.oninput = el.onchange = () => { LF[k] = el.value; const pos = el.selectionStart; render(); const n = $(id); n.focus(); if (pos != null && n.setSelectionRange) n.setSelectionRange(pos, pos); }; };
+  keep('#lf-q', 'q'); keep('#lf-v', 'v'); keep('#lf-c', 'c'); keep('#lf-y', 'y');
+  const c = $('#lf-clear'); if (c) c.onclick = () => { Object.keys(LF).forEach(k => LF[k] = ''); render(); };
+}
+let lastRoute = '';
+window.addEventListener('hashchange', () => {
+  if ($('#panel').classList.contains('on')) closePanel();
+  render();
+  const r = current().a; if (r !== lastRoute) { window.scrollTo(0, 0); lastRoute = r; }
+  $('#view').focus({ preventScroll: true });
+});
+$('#acct-btn').onclick = openAccount;
+
+render();
+load();
+if (db) { db.auth.onAuthStateChange(() => refreshAuth()); refreshAuth(); }
+</script>
+</body>
+</html>
