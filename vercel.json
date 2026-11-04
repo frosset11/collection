@@ -30,6 +30,14 @@
     {
       "source": "/sb/:path*",
       "destination": "https://ftettbbdgivkbamonywf.supabase.co/:path*"
+    },
+    {
+      "source": "/fipe/:path*",
+      "destination": "https://parallelum.com.br/fipe/api/v1/:path*"
+    },
+    {
+      "source": "/fx/:path*",
+      "destination": "https://api.frankfurter.dev/v1/:path*"
     }
   ]
 }

@@ -209,6 +209,16 @@ body.locked .login{display:grid}
 .linkbtn:hover{color:var(--fg)}
 /* dashboard */
 :root{--bar:#c4c5c9}
+.dvr{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr) 56px;gap:12px;align-items:center;padding:6px 0;text-decoration:none}
+.dvr .l{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg2)}
+.dvr:hover .l{color:var(--fg)}
+.dvr .tr{display:grid;grid-template-columns:1fr 1px 1fr;align-items:center;height:14px}
+.dvr .half{display:flex;height:12px}.dvr .neg{justify-content:flex-end}
+.dvr .neg .b{border-radius:4px 0 0 4px}.dvr .pos .b{border-radius:0 4px 4px 0}
+.dvr .b{display:block;height:100%;min-width:2px}
+.dvr .axis{height:20px;background:var(--line2)}
+.dvr .v{font-family:var(--mono);font-size:12.5px;text-align:right}
+@media (max-width:720px){.dvr{grid-template-columns:minmax(0,96px) minmax(0,1fr) 48px;gap:8px}}
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:0 0 44px}
 .kpis>div{background:var(--s1);padding:18px 20px 20px;min-width:0}
 .kpis dt{font-size:11px;color:var(--fg3);text-transform:uppercase;letter-spacing:.08em}
@@ -320,7 +330,7 @@ body.locked .login{display:grid}
       <a class="tab" href="#/cars" data-r="cars">Cars<span class="n" id="n-cars"></span></a>
       <a class="tab" href="#/bikes" data-r="bikes">Bikes<span class="n" id="n-bikes"></span></a>
       <a class="tab" href="#/ledger" data-r="ledger">Service ledger</a>
-      <a class="tab" href="#/costs" data-r="costs">Costs</a>
+      <a class="tab" href="#/portfolio" data-r="portfolio">Portfolio</a>
     </nav>
     <div class="acct">
       <span class="live" id="live" data-s="loading" title="Database connection"><i></i><span id="live-t">Connecting</span></span>
@@ -364,7 +374,7 @@ const STATUS = { owned:'Owned', project:'Project', stored:'Stored', sold:'Sold' 
 /* ---------- state ---------- */
 let db = null;
 try { db = window.supabase.createClient(SUPA_URL, SUPA_KEY); } catch (e) { db = null; }
-const S = { vehicles: [], records: [], readings: [], user: null, editor: false };
+const S = { vehicles: [], records: [], readings: [], comps: [], fx: null, user: null, editor: false };
 window.live = { state: 'loading', counts: {} };
 
 /* ---------- helpers ---------- */
@@ -435,22 +445,26 @@ async function load() {
     const cols = t => full ? '*' : PUBLIC_COLS[t];
     S.loadedFull = full;
     const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), 10000));
-    const [v, r, o] = await Promise.race([timeout, Promise.all([
+    const fx = Promise.race([loadFx(), new Promise(r => setTimeout(r, 4000))]);
+    const [v, r, o, mc] = await Promise.race([timeout, Promise.all([
       db.from('vehicles').select(cols('vehicles')).order('sort_order').order('year', { ascending: false }),
       db.from('service_records').select(cols('service_records')).order('date', { ascending: false, nullsFirst: false }),
-      db.from('odometer_readings').select(cols('odometer_readings')).order('date', { ascending: false, nullsFirst: false })
+      db.from('odometer_readings').select(cols('odometer_readings')).order('date', { ascending: false, nullsFirst: false }),
+      db.from('market_comps').select('*').order('date', { ascending: false })
     ])]);
-    const err = v.error || r.error || o.error;
+    await fx;
+    const err = v.error || r.error || o.error || mc.error;
     if (err && !load.retried && /jwt|token|401|PGRST30/i.test((err.code || '') + ' ' + (err.message || ''))) {
       load.retried = true; console.warn('Stored sign-in rejected; signing out on this device', err);
       await db.auth.signOut({ scope: 'local' }).catch(() => {}); toast('Your sign-in expired. Please sign in again.', true); return load();
     }
     if (err) throw err;
-    S.vehicles = v.data; S.records = sortRecs(r.data); S.readings = o.data; S.offline = null;
+    S.vehicles = v.data; S.records = sortRecs(r.data); S.readings = o.data; S.comps = mc.data || []; S.offline = null;
     if (!full) stripPrivate();
     await signMedia();
-    try { localStorage.setItem('hc-cache', JSON.stringify({ saved: new Date().toISOString().slice(0, 10), vehicles: v.data, records: r.data, readings: o.data })); } catch (e) {}
+    try { localStorage.setItem('hc-cache', JSON.stringify({ saved: new Date().toISOString().slice(0, 10), vehicles: v.data, records: r.data, readings: o.data, comps: mc.data || [] })); } catch (e) {}
     setLive('live');
+    setTimeout(refreshFipe, 50);
   } catch (e) { console.warn('Database unreachable, showing saved copy', e); await useSnapshot(/timed out/.test(e.message || '') ? 'the database didn\'t answer' : 'the database couldn\'t be reached'); return; }
   render();
 }
@@ -458,7 +472,8 @@ async function useSnapshot(reason) {
   let snap = null;
   try { snap = JSON.parse(localStorage.getItem('hc-cache') || 'null'); } catch (e) {}
   snap = snap || { vehicles: [], records: [], readings: [] };
-  S.vehicles = snap.vehicles || []; S.records = sortRecs(snap.records || []); S.readings = snap.readings || [];
+  S.vehicles = snap.vehicles || []; S.records = sortRecs(snap.records || []); S.readings = snap.readings || []; S.comps = snap.comps || [];
+  if (!S.fx) await loadFx().catch(() => {});
   S.offline = { reason, saved: snap.saved };
   await signMedia().catch(() => {});
   if (!S.user) stripPrivate();
@@ -592,7 +607,7 @@ document.addEventListener('keydown', e => {
     else if (!e.shiftKey && document.activeElement === f[f.length-1]) { e.preventDefault(); f[0].focus(); }
   }
   if (!open && !e.metaKey && !e.ctrlKey && !e.altKey && !/input|select|textarea/i.test(document.activeElement.tagName)) {
-    const map = { '1':'dashboard', '2':'cars', '3':'bikes', '4':'ledger', '5':'costs' };
+    const map = { '1':'dashboard', '2':'cars', '3':'bikes', '4':'ledger', '5':'portfolio' };
     if (map[e.key]) location.hash = '#/' + map[e.key];
   }
 });
@@ -717,7 +732,7 @@ function viewVehicle(id) {
           <div><dt>${v.meter === 'hours' ? 'Hours' : 'Odometer'}</dt><dd>${v.meter === 'hours' ? (v.hours != null ? (+v.hours).toLocaleString('en-US') + ' <small>h</small>' : '—') : v.odometer != null ? num(v.odometer) + ` <small>${v.odometer_unit}</small>` + (v.meter === 'both' && v.hours != null ? ` <small>· ${(+v.hours).toLocaleString('en-US')} h</small>` : '') : '—'}</dd></div>
           <div><dt>${v.meter === 'hours' ? 'Hours' : 'Driven'} in ${YEAR}</dt><dd>${v.meter === 'hours' ? yHours(v) : (d => d ? Math.round(d).toLocaleString('en-US') + ` <small>${v.odometer_unit}</small>` : '—')(drivenIn(v, YEAR, v.odometer_unit))}</dd></div>
           ${S.user ? `<div><dt>Paid</dt><dd>${money(v.purchase_price, 0, v.currency)}</dd></div>
-          <div><dt>Estimated value</dt><dd>${v.estimated_value != null ? money(v.estimated_value, 0, v.currency) : (S.editor ? `<button class="btn sm" type="button" data-edit-v="${v.id}">Add estimate</button>` : '—')}</dd></div>
+          <div><dt>Market value</dt><dd>${(m => m != null ? money(m, 0, v.currency) : '—')(valuation(v).value)}</dd></div>
           <div><dt>Service & parts</dt><dd>${msum(sp)}</dd></div>
           <div><dt>Total in</dt><dd>${msum(addSums(paid(v), sp))}</dd></div>` : ''}
           <div><dt>Owned</dt><dd>${owned != null ? (owned >= 365 ? (owned / 365).toFixed(1) + ' <small>yrs</small>' : owned + ' <small>days</small>') : '—'}</dd></div>
@@ -727,6 +742,7 @@ function viewVehicle(id) {
       </div>
     </div>
     ${vehicleCharts(v)}
+    ${S.user ? marketSection(v) : ''}
     <div class="section"><h2>Specifications</h2>${dl(spec)}</div>
     <div class="section"><h2>Ownership</h2>${dl(own)}</div>
     ${v.notes ? `<div class="section"><h2>Notes</h2><p class="notes">${esc(v.notes)}</p></div>` : ''}
@@ -792,11 +808,8 @@ function viewLedger() {
     <p class="summary"><span><b>${list.length}</b> record${list.length === 1 ? '' : 's'}</span>${S.user ? `<span>Total <b>${msum(total, 1)}</b></span><span class="hint">Reais and dollars are totalled separately, never converted.</span>` : `<span class="hint">Amounts are private. ${lockNote().replace('Sign in to edit', 'Sign in to see them')}</span>`}${list.some(r => r.confidence === 'est') ? '<span class="hint">* estimated, not from a receipt</span>' : ''}</p>
     ${list.length ? rowsHtml(list, true) : `<div class="empty"><h2>No records match</h2><p>Try a different search or clear the filters.</p><button class="btn" type="button" id="lf-clear">Clear filters</button></div>`}`;
 }
-function viewCosts() {
-  const head = `<div class="head"><div><p class="eyebrow">What the collection has cost</p><h1>Costs</h1><p class="sub">Reais and dollars are shown separately, never converted.</p></div></div>`;
-  if (window.live.state === 'loading') return head + '<div class="skel" style="height:240px"></div>';
-  if (!S.user) return head + `<div class="empty"><h2>Costs are private</h2><p>Purchase prices, values and service spend are only visible when you're signed in.</p><button class="btn" type="button" data-signin>Sign in</button></div>`;
-  if (!S.vehicles.length) return head + `<div class="empty"><h2>Nothing to total yet</h2><p>Purchase prices and service spend for each vehicle will add up here.</p><a class="btn" href="#/cars">Go to cars</a></div>`;
+function costsBody() {
+  const head = '';
   const rows = S.vehicles.map(v => ({ v, p: paid(v), s: spent(v.id), n: recsFor(v.id).length, last: recsFor(v.id).find(r => r.date)?.date }));
   const T = { p: addSums(...rows.map(r => r.p)), s: addSums(...rows.map(r => r.s)), n: rows.reduce((a, r) => a + r.n, 0) };
   const byCat = Object.keys(CATEGORIES).map(k => { const l = S.records.filter(r => r.category === k); return [k, sumBy(l), l.length]; }).filter(x => x[2]);
@@ -1067,15 +1080,15 @@ function viewDashboard() {
   if (!S.vehicles.length) return head + `<div class="empty"><h2>Your garage is empty</h2><p>Add a car or a bike and it shows up here as a tile.</p>${S.editor ? `<button class="btn primary" type="button" data-add-v="car">${ICON.plus}Add vehicle</button>` : `<button class="btn" type="button" data-signin>Sign in to add vehicles</button>`}</div>`;
   const owned = S.vehicles.filter(v => v.status !== 'sold');
   const cars = owned.filter(v => v.kind === 'car').length, bikes = owned.length - cars;
-  const value = addSums(...owned.map(v => v.estimated_value != null ? { [v.currency || 'USD']: +v.estimated_value } : paid(v)));
-  const valued = owned.filter(v => v.estimated_value != null).length;
+  const value = addSums(...owned.map(v => { const m = valuation(v).value; return m != null ? { [v.currency || 'USD']: m } : paid(v); }));
+  const valued = owned.filter(v => valuation(v).value != null).length;
   const yRecs = S.records.filter(r => (r.date || '').startsWith(YEAR));
   const ySpend = sumBy(yRecs);
   const driven = owned.map(v => ({ v, d: drivenIn(v, YEAR, distUnit) })).filter(x => x.d >= 1).sort((a, b) => b.d - a.d);
   const totalDriven = driven.reduce((a, x) => a + x.d, 0);
   const kpis = `<dl class="kpis">
     <div><dt>Vehicles</dt><dd>${owned.length}</dd><small>${cars} car${cars === 1 ? '' : 's'} · ${bikes} bike${bikes === 1 ? '' : 's'}</small></div>
-    ${S.user ? `<div><dt>Collection value</dt><dd class="sm">${msum(value).replace(' + ', '<br>')}</dd><small>${valued ? `${valued} estimated, ${owned.length - valued} at purchase price` : 'At purchase price — add estimates under Edit details'}</small></div>
+    ${S.user ? `<div><dt>Collection value</dt><dd class="sm">${msum(value).replace(' + ', '<br>')}</dd><small>${valued ? `${valued} at market value, ${owned.length - valued} at purchase price · <a href="#/portfolio">Portfolio</a>` : 'At purchase price — add market data on each vehicle'}</small></div>
     <div><dt>Service in ${YEAR}</dt><dd class="sm">${msum(ySpend).replace(' + ', '<br>')}</dd><small>${yRecs.length} record${yRecs.length === 1 ? '' : 's'}</small></div>`
     : `<div><dt>Collection value</dt><dd class="sm" style="color:var(--fg3)">Private</dd><small>${lockNote().replace('to edit', 'to see values')}</small></div>
     <div><dt>Service in ${YEAR}</dt><dd>${yRecs.length}</dd><small>record${yRecs.length === 1 ? '' : 's'} logged this year</small></div>`}
@@ -1178,24 +1191,218 @@ function openReadingForm(v, r) {
   });
 }
 
+/* ---------- market values & portfolio ---------- */
+const SRC = { bat: 'Bring a Trailer', webmotors: 'Webmotors', carsandbids: 'Cars & Bids', classic: 'Classic.com', other: 'Other' };
+const srcFromUrl = u => /bringatrailer\.com/i.test(u) ? 'bat' : /webmotors\.com/i.test(u) ? 'webmotors' : /carsandbids\.com/i.test(u) ? 'carsandbids' : /classic\.com/i.test(u) ? 'classic' : 'other';
+const today = () => new Date().toISOString().slice(0, 10);
+async function loadFx() {
+  try { const c = JSON.parse(localStorage.getItem('hc-fx') || 'null'); if (c && c.rate) S.fx = c; } catch (e) {}
+  try {
+    const r = await fetch('/fx/latest?base=USD&symbols=BRL', { cache: 'no-store' }); const j = await r.json();
+    if (j && j.rates && j.rates.BRL) { S.fx = { rate: +j.rates.BRL, date: j.date }; try { localStorage.setItem('hc-fx', JSON.stringify(S.fx)); } catch (e) {} }
+  } catch (e) { console.warn('Exchange rate unavailable', e); }
+}
+const toCur = (amt, from, to) => amt == null ? null : from === to ? +amt : !S.fx ? null : from === 'USD' ? amt * S.fx.rate : amt / S.fx.rate;
+const median = a => { const s = [...a].sort((x, y) => x - y), n = s.length; return !n ? null : n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; };
+const compsFor = id => (S.comps || []).filter(c => c.vehicle_id === id).sort((a, b) => b.date.localeCompare(a.date));
+function valuation(v) {
+  const cur = v.currency || 'USD';
+  if (v.value_source === 'manual') return v.estimated_value != null ? { value: +v.estimated_value, source: 'manual', label: 'Your estimate' + (v.value_date ? ' · ' + fdate(v.value_date) : '') } : { value: null, source: 'manual', label: 'No estimate yet' };
+  const inc = compsFor(v.id).filter(c => c.include);
+  const cutoff = new Date(Date.now() - 730 * 864e5).toISOString().slice(0, 10);
+  let pool = inc.filter(c => c.date >= cutoff); if (!pool.length) pool = inc;
+  const sold = pool.filter(c => c.kind === 'sold'), use = sold.length ? sold : pool;
+  const vals = use.map(c => toCur(+c.price, c.currency, cur)).filter(x => x != null);
+  if (vals.length) return { value: median(vals), source: 'comps', label: `Median of ${vals.length} ${sold.length ? 'sold' : 'asking'} price${vals.length === 1 ? '' : 's'}` };
+  if (v.fipe_value != null) { const x = toCur(+v.fipe_value, 'BRL', cur); if (x != null) return { value: x, source: 'fipe', label: 'FIPE' + (v.fipe_ref ? ' · ' + v.fipe_ref : '') }; }
+  if (v.estimated_value != null) return { value: +v.estimated_value, source: 'manual', label: 'Your estimate' };
+  return { value: null, source: null, label: 'Not valued yet' };
+}
+function perf(v) {
+  const val = valuation(v), pp = v.purchase_price != null ? +v.purchase_price : null, cur = v.currency || 'USD';
+  const svc = recsFor(v.id).reduce((a, r) => a + (toCur(+r.amount || 0, r.currency || cur, cur) || 0), 0);
+  const gain = val.value != null && pp ? val.value - pp : null;
+  const years = v.purchase_date ? (Date.now() - Date.parse(v.purchase_date)) / (365.25 * 864e5) : null;
+  const cagr = gain != null && years >= 1 && pp > 0 && val.value > 0 ? (val.value / pp) ** (1 / years) - 1 : null;
+  return { v, val, pp, cur, svc, gain, pct: gain != null ? gain / pp : null, gainAll: val.value != null && pp ? val.value - pp - svc : null, years, cagr };
+}
+const pctStr = x => x == null ? '—' : (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x * 100).toFixed(Math.abs(x) < 0.1 ? 1 : 0) + '%';
+const signMoney = (x, cur) => x == null ? '—' : (x > 0 ? '+' : x < 0 ? '−' : '') + money(Math.abs(x), 0, cur);
+const GAIN = '#3987e5', LOSS = '#e66767';
+function divBars(items) {
+  const max = Math.max(...items.map(i => Math.abs(i.value)), 0.01);
+  return `<div class="dv">${items.map(i => `<a class="dvr" href="${i.href}" data-tip="${esc(i.tip)}"><span class="l">${esc(i.label)}</span><span class="tr"><span class="half neg">${i.value < 0 ? `<span class="b" style="width:${(-i.value / max * 100).toFixed(2)}%;background:${LOSS}"></span>` : ''}</span><span class="axis"></span><span class="half pos">${i.value > 0 ? `<span class="b" style="width:${(i.value / max * 100).toFixed(2)}%;background:${GAIN}"></span>` : ''}</span></span><span class="v">${pctStr(i.value)}</span></a>`).join('')}</div>`;
+}
+let PCUR = (() => { try { return localStorage.getItem('hc-pcur') || 'BRL'; } catch (e) { return 'BRL'; } })();
+function viewPortfolio() {
+  const head = (extra = '') => `<div class="head"><div><p class="eyebrow">The collection as an investment</p><h1>Portfolio</h1>${extra}</div>
+    <div class="seg sm" role="group" aria-label="Show totals in">${['BRL', 'USD'].map(c => `<button type="button" data-pcur="${c}" aria-pressed="${PCUR === c}">${SYM[c]}</button>`).join('')}</div></div>`;
+  if (window.live.state === 'loading') return head() + '<div class="skel" style="height:240px"></div>';
+  if (!S.vehicles.length) return head() + `<div class="empty"><h2>Nothing to value yet</h2><p>Add vehicles with their purchase price, then market values to track returns.</p></div>`;
+  const P = S.vehicles.filter(v => v.status !== 'sold').map(perf);
+  const valued = P.filter(p => p.val.value != null && p.pp), unvalued = P.filter(p => !(p.val.value != null && p.pp));
+  const T = k => valued.reduce((a, p) => a + (toCur(p[k], p.cur, PCUR) || 0), 0);
+  const mkt = valued.reduce((a, p) => a + (toCur(p.val.value, p.cur, PCUR) || 0), 0), paidT = T('pp'), svcT = T('svc');
+  const g = mkt - paidT, gAll = mkt - paidT - svcT;
+  const fxNote = S.fx ? `US$1 = R$${S.fx.rate.toFixed(2)} (ECB, ${fdate(S.fx.date)}). Each vehicle's return is in its own currency; totals are converted at today's rate.` : 'Exchange rate unavailable: totals only include vehicles priced in the selected currency.';
+  const kpis = `<dl class="kpis">
+    <div><dt>Market value</dt><dd class="sm">${money(mkt, 0, PCUR)}</dd><small>${valued.length} of ${P.length} vehicles valued</small></div>
+    <div><dt>Paid for these</dt><dd class="sm">${money(paidT, 0, PCUR)}</dd><small>Purchase prices</small></div>
+    <div><dt>Gain / loss</dt><dd class="sm" style="color:${g >= 0 ? GAIN : LOSS}">${signMoney(g, PCUR)}</dd><small>${pctStr(paidT ? g / paidT : null)} on purchase price</small></div>
+    <div><dt>After service costs</dt><dd class="sm" style="color:${gAll >= 0 ? GAIN : LOSS}">${signMoney(gAll, PCUR)}</dd><small>${pctStr(paidT + svcT ? gAll / (paidT + svcT) : null)} on ${money(paidT + svcT, 0, PCUR)} invested</small></div>
+  </dl>`;
+  const sorted = valued.slice().sort((a, b) => b.pct - a.pct);
+  if (!valued.length) return head(`<p class="sub">${esc(fxNote)}</p>`) + `<div class="empty" style="text-align:left;max-width:640px"><h2>Start valuing the collection</h2><p>Each vehicle needs a market value to compare with what you paid. Open a vehicle and, under Market value:</p>
+    <ol class="hint" style="margin:0 0 20px;padding-left:20px;line-height:1.8"><li><b style="color:var(--fg)">Add comparable</b>: paste a Bring a Trailer result or a Webmotors listing with its price and date. The median becomes the market value.</li><li><b style="color:var(--fg)">Link FIPE model</b>: for Brazilian vehicles, an automatic monthly reference price.</li><li><b style="color:var(--fg)">My estimate</b>: your own figure, for one-offs with no good comparables.</li></ol>
+    <a class="btn primary" href="#/cars">Go to cars</a></div>` + `<div class="section"><h2 style="font-size:22px;margin-bottom:6px">Costs</h2><p class="hint" style="margin:0 0 20px">Reais and dollars are shown separately, never converted.</p>${costsBody()}</div>`;
+  const chart = valued.length ? chartCard('Return on purchase price', 'Blue is a gain, red a loss · market value vs. price paid',
+    divBars(sorted.map(p => ({ label: vshort(p.v) + (p.v.colour && S.vehicles.filter(x => x.make === p.v.make && x.model === p.v.model).length > 1 ? ' ' + p.v.colour : ''), value: p.pct, href: '#/vehicle/' + p.v.id, tip: `${vname(p.v)}\nPaid ${money(p.pp, 0, p.cur)} · worth ${money(p.val.value, 0, p.cur)}\n${signMoney(p.gain, p.cur)} (${pctStr(p.pct)}) · ${p.val.label}` }))),
+    [['Vehicle', 'Paid', 'Market value', 'Gain', 'Return'], ...sorted.map(p => [vname(p.v), money(p.pp, 0, p.cur), money(p.val.value, 0, p.cur), signMoney(p.gain, p.cur), pctStr(p.pct)])]) : '';
+  const chip = s => `<span class="chip">${s === 'comps' ? 'Comps' : s === 'fipe' ? 'FIPE' : s === 'manual' ? 'Estimate' : '—'}</span>`;
+  const row = p => `<tr><td><a href="#/vehicle/${p.v.id}">${esc(vname(p.v))}</a></td><td>${chip(p.val.source)}</td><td class="n">${money(p.pp, 0, p.cur)}</td><td class="n">${p.val.value != null ? money(p.val.value, 0, p.cur) : '—'}</td>
+    <td class="n" style="color:${p.gain == null ? 'inherit' : p.gain >= 0 ? GAIN : LOSS}">${signMoney(p.gain, p.cur)}</td><td class="n">${pctStr(p.pct)}</td><td class="n">${p.cagr != null ? pctStr(p.cagr) + '/yr' : '—'}</td><td class="n">${p.years != null ? p.years.toFixed(1) + ' yrs' : '—'}</td></tr>`;
+  const table = `<div class="section"><h2>Holdings</h2><div class="tbl-wrap"><table>
+    <thead><tr><th scope="col">Vehicle</th><th scope="col">Value from</th><th scope="col" class="n">Paid</th><th scope="col" class="n">Market value</th><th scope="col" class="n">Gain / loss</th><th scope="col" class="n">Return</th><th scope="col" class="n">Annualized</th><th scope="col" class="n">Held</th></tr></thead>
+    <tbody>${sorted.map(row).join('')}</tbody></table></div>
+    ${unvalued.length ? `<details style="margin:14px 0 0"><summary class="hint" style="cursor:pointer">${unvalued.length} vehicle${unvalued.length === 1 ? '' : 's'} not valued yet</summary><p class="hint" style="margin:10px 0 0">${unvalued.map(p => `<a href="#/vehicle/${p.v.id}">${esc(vname(p.v))}</a>${!p.pp ? ' (no purchase price)' : ''}`).join(', ')}. Open a vehicle and add comparable sales or link its FIPE model.</p></details>` : ''}</div>`;
+  return head(`<p class="sub">${esc(fxNote)}</p>`) + kpis + (chart ? `<div class="charts" style="grid-template-columns:1fr">${chart}</div>` : '') + table +
+    `<div class="section"><h2 style="font-size:22px;margin-bottom:6px">Costs</h2><p class="hint" style="margin:0 0 20px">Reais and dollars are shown separately, never converted.</p>${costsBody()}</div>`;
+}
+
+/* vehicle page: market value section */
+function marketSection(v) {
+  const p = perf(v), comps = compsFor(v.id), cur = v.currency || 'USD';
+  const tiles = `<dl class="stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:0 0 20px">
+    <div><dt>Market value</dt><dd>${p.val.value != null ? money(p.val.value, 0, cur) : '—'}</dd></div>
+    <div><dt>Paid</dt><dd>${money(p.pp, 0, cur)}</dd></div>
+    <div><dt>Gain / loss</dt><dd style="color:${p.gain == null ? 'inherit' : p.gain >= 0 ? GAIN : LOSS}">${signMoney(p.gain, cur)} <small>${p.pct != null ? pctStr(p.pct) : ''}</small></dd></div>
+    <div><dt>Annualized</dt><dd>${p.cagr != null ? pctStr(p.cagr) + ' <small>/yr</small>' : '—'}</dd></div>
+  </dl>`;
+  const mode = `<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px"><span class="hint">Value from: <b style="color:var(--fg)">${esc(p.val.label)}</b></span>
+    ${S.editor ? `<div class="seg sm" role="group" aria-label="Valuation method">${[['auto', 'Market data'], ['manual', 'My estimate']].map(([k, l]) => `<button type="button" data-vsrc="${k}" aria-pressed="${(v.value_source || 'auto') === k}">${l}</button>`).join('')}</div>` : ''}
+    ${v.value_source === 'manual' && S.editor ? `<button class="btn sm" type="button" data-edit-v="${v.id}">Edit estimate</button>` : ''}</div>`;
+  const fipe = v.fipe_model
+    ? `<div class="li" style="border-top:1px solid var(--line)"><span style="min-width:0"><span class="t" style="display:block">FIPE · ${esc(v.fipe_label || '')}</span><span class="m" style="display:block">${esc([v.fipe_code, v.fipe_ref].filter(Boolean).join(' · '))}${v.fipe_checked ? ' · checked ' + fdate(v.fipe_checked) : ''}</span></span><span class="r">${v.fipe_value != null ? money(v.fipe_value, 0, 'BRL') : '—'} ${S.editor ? `<button class="btn sm" type="button" data-fipe="${v.id}" style="margin-left:8px">Change</button>` : ''}</span></div>`
+    : (S.editor ? `<p class="hint" style="margin:0 0 6px">Link this ${v.kind === 'bike' ? 'bike' : 'car'} to the FIPE table for an automatic monthly reference price (Brazilian market; rare classics may not be listed). <button class="btn sm" type="button" data-fipe="${v.id}" style="margin-left:6px">Link FIPE model</button></p>` : '');
+  const list = comps.length ? `<div class="rows">${comps.map(c => `<button class="row" type="button" data-comp="${c.id}" style="${c.include ? '' : 'opacity:.5'}"><span class="d">${fdate(c.date)}</span><span class="tm"><span class="t" style="display:block">${esc(c.title || SRC[c.source])}</span><span class="m" style="display:block">${esc(SRC[c.source])} · ${c.kind === 'sold' ? 'Sold' : 'Asking'}${c.mileage != null ? ' · ' + num(c.mileage) + ' ' + c.mileage_unit : ''}${c.include ? '' : ' · excluded'}</span></span><span class="mi">${c.currency !== cur && S.fx ? '≈ ' + money(toCur(+c.price, c.currency, cur), 0, cur) : ''}</span><span class="a">${money(c.price, 0, c.currency)}</span></button>`).join('')}</div>`
+    : `<p class="none">No comparable sales yet. Add Bring a Trailer results or Webmotors listings for the same model to build a market value.</p>`;
+  return `<div class="section"><div class="section-head"><h2>Market value</h2>${S.editor ? `<button class="btn sm" type="button" data-add-comp="${v.id}">${ICON.plus}Add comparable</button>` : ''}</div>
+    ${tiles}${mode}${fipe}<h3 style="font-size:14px;margin:22px 0 10px">Comparable sales</h3>${list}</div>`;
+}
+function openCompForm(v, c) {
+  const isNew = !c;
+  c = c || { kind: 'sold', currency: v.currency || 'USD', date: today(), include: true, mileage_unit: v.odometer_unit || 'mi' };
+  openPanel(isNew ? 'Add comparable' : 'Edit comparable', `
+    <p class="hint" style="margin:0 0 18px">${esc(vname(v))}. Use sales of the same model and similar condition.</p>
+    <form id="cp-form" novalidate>
+      ${field('url', 'Listing link', 'url', c.url, { ph: 'https://bringatrailer.com/listing/…', help: 'Bring a Trailer, Webmotors, Cars & Bids or any other site.' })}
+      ${field('title', 'Title', 'text', c.title, { ph: '1989 BMW M3, 62k miles' })}
+      <div class="two">${field('price', 'Price', 'text', c.price ?? '', { inputmode: 'decimal', required: true })}${field('currency', 'Currency', 'select', c.currency, { required: true, options: Object.entries(CURRENCIES) })}</div>
+      <div class="two">${field('kind', 'Type', 'select', c.kind, { required: true, options: [['sold', 'Sold price'], ['asking', 'Asking price']] })}${field('date', 'Date', 'date', c.date, { required: true })}</div>
+      <div class="two">${field('mileage', 'Mileage', 'text', c.mileage != null ? num(c.mileage) : '', { inputmode: 'numeric' })}${field('mileage_unit', 'Unit', 'select', c.mileage_unit, { required: true, options: [['mi', 'Miles'], ['km', 'Kilometres']] })}</div>
+      <label class="check"><input type="checkbox" name="include" ${c.include ? 'checked' : ''}> Use this sale in the market value</label>
+      ${field('notes', 'Notes', 'text', c.notes, { ph: 'Condition, options, why it compares…' })}
+      ${!isNew ? `<fieldset style="margin-top:8px"><legend>Delete</legend><div id="del-box"><button class="btn danger" type="button" id="del-cp">Delete this comparable…</button></div></fieldset>` : ''}
+    </form>`,
+    `<button class="btn" type="button" id="cancel">Cancel</button><button class="btn primary" type="button" data-submit>${isNew ? 'Add comparable' : 'Save changes'}</button>`);
+  $('#cancel').onclick = closePanel;
+  $('#f-url').addEventListener('change', e => { if (/webmotors\.com/i.test(e.target.value)) { $('#f-currency').value = 'BRL'; $('#f-mileage_unit').value = 'km'; } else if (/bringatrailer|carsandbids/i.test(e.target.value)) { $('#f-currency').value = 'USD'; $('#f-mileage_unit').value = 'mi'; } if (/webmotors/i.test(e.target.value)) $('#f-kind').value = 'asking'; });
+  if (!isNew) $('#del-cp').onclick = () => {
+    $('#del-box').innerHTML = `<div class="confirm"><p>Delete <b>${esc(c.title || SRC[c.source])}</b> (${money(c.price, 0, c.currency)})? This can't be undone.</p><button class="btn" type="button" id="del-no">Keep it</button> <button class="btn danger solid" type="button" id="del-yes">Delete comparable</button></div>`;
+    $('#del-no').onclick = () => openCompForm(v, c);
+    $('#del-yes').onclick = async () => { const { error } = await db.from('market_comps').delete().eq('id', c.id); if (error) return toast('Couldn\'t delete: ' + error.message, true); S.comps = S.comps.filter(x => x.id !== c.id); closePanel(); toast('Comparable deleted'); render(); };
+  };
+  wireForm('#cp-form', {
+    url: x => x && !/^https?:\/\/\S+\.\S+/.test(x.trim()) ? 'Paste the full link, starting with https://' : '',
+    price: x => !x ? 'Enter the price.' : !/^\$?[\d,]*\.?\d{0,2}$/.test(x.trim()) || !(nMoney(x) > 0) ? 'Price should be an amount, like 85,000.' : '',
+    date: x => !x ? 'Enter the sale or listing date.' : x > today() ? 'The date can\'t be in the future.' : '',
+    mileage: intRule('Mileage')
+  }, async f => {
+    const url = nz((f.url || '').trim());
+    const row = { vehicle_id: v.id, url, source: url ? srcFromUrl(url) : (c.source || 'other'), title: nz(f.title.trim()), price: nMoney(f.price), currency: f.currency, kind: f.kind, date: f.date, mileage: nInt(f.mileage), mileage_unit: f.mileage_unit, include: !!f.include, notes: nz((f.notes || '').trim()) };
+    const res = isNew ? await db.from('market_comps').insert(row).select().single() : await db.from('market_comps').update(row).eq('id', c.id).select().single();
+    if (res.error) throw new Error('Couldn\'t save: ' + res.error.message);
+    S.comps = isNew ? [res.data, ...S.comps] : S.comps.map(x => x.id === c.id ? res.data : x);
+    closePanel(); toast(isNew ? 'Comparable added' : 'Saved'); render();
+  });
+}
+const parseBRL = s => +String(s || '').replace(/[^\d,]/g, '').replace(',', '.');
+async function fipeGet(path) { const r = await fetch('/fipe/' + path); if (!r.ok) throw new Error('FIPE didn\'t answer (' + r.status + '). Try again in a minute.'); return r.json(); }
+async function refreshFipe() {
+  if (!S.editor || !db) return;
+  const month = today().slice(0, 7);
+  const due = S.vehicles.filter(v => v.fipe_model && v.fipe_year && (!v.fipe_checked || v.fipe_checked.slice(0, 7) < month));
+  let changed = false;
+  for (const v of due) {
+    try {
+      const j = await fipeGet(`${v.fipe_type}/marcas/${v.fipe_brand}/modelos/${v.fipe_model}/anos/${v.fipe_year}`);
+      const u = await db.from('vehicles').update({ fipe_value: parseBRL(j.Valor), fipe_ref: j.MesReferencia, fipe_code: j.CodigoFipe, fipe_checked: today() }).eq('id', v.id).select().single();
+      if (!u.error) { S.vehicles = S.vehicles.map(x => x.id === v.id ? { ...x, ...u.data } : x); changed = true; }
+    } catch (e) { console.warn('FIPE refresh failed for', vname(v), e); }
+  }
+  if (changed) render();
+}
+function openFipeForm(v) {
+  const st = { type: v.fipe_type || (v.kind === 'bike' ? 'motos' : 'carros'), brand: v.fipe_brand || '', model: v.fipe_model || '', year: v.fipe_year || '', brands: [], models: [], years: [], q: '', price: null };
+  const opts = (list, sel, ph) => `<option value="">${ph}</option>` + list.map(o => `<option value="${esc(o.codigo)}"${String(o.codigo) === String(sel) ? ' selected' : ''}>${esc(o.nome)}</option>`).join('');
+  const draw = (msg) => {
+    const ms = st.q ? st.models.filter(m => m.nome.toLowerCase().includes(st.q.toLowerCase())) : st.models;
+    openPanel('Link FIPE model', `
+      <p class="hint" style="margin:0 0 18px">${esc(vname(v))}. Pick the exact version; the price refreshes automatically each month.</p>
+      ${msg ? `<div class="form-err" role="alert">${esc(msg)}</div>` : ''}
+      <div class="fld"><label for="fp-type">Type</label><select id="fp-type"><option value="carros"${st.type === 'carros' ? ' selected' : ''}>Car</option><option value="motos"${st.type === 'motos' ? ' selected' : ''}>Motorcycle</option></select></div>
+      <div class="fld"><label for="fp-brand">Make</label><select id="fp-brand">${opts(st.brands, st.brand, st.brands.length ? 'Choose a make' : 'Loading…')}</select></div>
+      ${st.brand ? `<div class="fld"><label for="fp-q">Filter models</label><input id="fp-q" type="search" value="${esc(st.q)}" placeholder="Type part of the name, e.g. Abarth"></div>
+      <div class="fld"><label for="fp-model">Model and version</label><select id="fp-model">${opts(ms, st.model, st.models.length ? `Choose from ${ms.length} model${ms.length === 1 ? '' : 's'}` : 'Loading…')}</select></div>` : ''}
+      ${st.model ? `<div class="fld"><label for="fp-year">Model year</label><select id="fp-year">${opts(st.years, st.year, st.years.length ? 'Choose a year' : 'Loading…')}</select></div>` : ''}
+      ${st.price ? `<div class="kv" style="margin-top:8px"><dt>FIPE price</dt><dd class="mono">${esc(st.price.Valor)}</dd><dt>Reference</dt><dd>${esc(st.price.MesReferencia)} · ${esc(st.price.CodigoFipe)}</dd></div>` : ''}
+      ${v.fipe_model ? `<button class="btn danger sm" type="button" id="fp-unlink" style="margin-top:12px">Unlink FIPE</button>` : ''}`,
+      `<button class="btn" type="button" id="cancel">Cancel</button><button class="btn primary" type="button" id="fp-save" ${st.price ? '' : 'disabled'}>Save link</button>`);
+    $('#cancel').onclick = closePanel;
+    $('#fp-type').onchange = e => { Object.assign(st, { type: e.target.value, brand: '', model: '', year: '', brands: [], models: [], years: [], price: null }); go(); };
+    $('#fp-brand').onchange = e => { Object.assign(st, { brand: e.target.value, model: '', year: '', models: [], years: [], price: null, q: '' }); go(); };
+    if ($('#fp-q')) $('#fp-q').oninput = e => { st.q = e.target.value; const pos = e.target.selectionStart; draw(); $('#fp-q').focus(); $('#fp-q').setSelectionRange(pos, pos); };
+    if ($('#fp-model')) $('#fp-model').onchange = e => { Object.assign(st, { model: e.target.value, year: '', years: [], price: null }); go(); };
+    if ($('#fp-year')) $('#fp-year').onchange = e => { Object.assign(st, { year: e.target.value, price: null }); go(); };
+    if ($('#fp-unlink')) $('#fp-unlink').onclick = async () => { const u = await db.from('vehicles').update({ fipe_type: null, fipe_brand: null, fipe_model: null, fipe_year: null, fipe_label: null, fipe_code: null, fipe_value: null, fipe_ref: null, fipe_checked: null }).eq('id', v.id).select().single(); if (u.error) return toast('Couldn\'t unlink: ' + u.error.message, true); S.vehicles = S.vehicles.map(x => x.id === v.id ? { ...x, ...u.data } : x); closePanel(); toast('FIPE unlinked'); render(); };
+    $('#fp-save').onclick = async () => {
+      const m = st.models.find(x => String(x.codigo) === String(st.model)), y = st.years.find(x => String(x.codigo) === String(st.year));
+      const upd = { fipe_type: st.type, fipe_brand: String(st.brand), fipe_model: String(st.model), fipe_year: String(st.year), fipe_label: `${m ? m.nome : ''} · ${y ? y.nome : ''}`, fipe_code: st.price.CodigoFipe, fipe_value: parseBRL(st.price.Valor), fipe_ref: st.price.MesReferencia, fipe_checked: today() };
+      const u = await db.from('vehicles').update(upd).eq('id', v.id).select().single();
+      if (u.error) return draw('Couldn\'t save: ' + u.error.message);
+      S.vehicles = S.vehicles.map(x => x.id === v.id ? { ...x, ...u.data } : x); closePanel(); toast('FIPE linked'); render();
+    };
+  };
+  const go = async () => {
+    draw();
+    try {
+      if (!st.brands.length) { st.brands = await fipeGet(`${st.type}/marcas`); draw(); }
+      if (st.brand && !st.models.length) { st.models = (await fipeGet(`${st.type}/marcas/${st.brand}/modelos`)).modelos || []; draw(); }
+      if (st.model && !st.years.length) { st.years = await fipeGet(`${st.type}/marcas/${st.brand}/modelos/${st.model}/anos`); draw(); }
+      if (st.year && !st.price) { st.price = await fipeGet(`${st.type}/marcas/${st.brand}/modelos/${st.model}/anos/${st.year}`); draw(); }
+    } catch (e) { draw(e.message); }
+  };
+  go();
+}
+
 /* ---------- router ---------- */
 function current() { const h = location.hash.replace(/^#\/?/, '') || 'dashboard'; const [a, b] = h.split('/'); return { a, b }; }
 function render() {
   const { a, b } = current();
-  const tab = a === 'vehicle' ? (vById(b)?.kind === 'bike' ? 'bikes' : 'cars') : a;
+  const tab = a === 'costs' ? 'portfolio' : a === 'vehicle' ? (vById(b)?.kind === 'bike' ? 'bikes' : 'cars') : a;
   document.querySelectorAll('.tab').forEach(t => t.toggleAttribute('aria-current', false) || (t.dataset.r === tab && t.setAttribute('aria-current', 'page')));
   $('#n-cars').textContent = S.vehicles.filter(v => v.kind === 'car').length || '';
   $('#n-bikes').textContent = S.vehicles.filter(v => v.kind === 'bike').length || '';
-  document.querySelector('.tab[data-r="costs"]').hidden = !S.user;
+  document.querySelector('.tab[data-r="portfolio"]').hidden = !S.user;
   const banner = window.live.state === 'offline' ? `<div class="banner" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span>Offline: ${esc(S.offline?.reason || 'the database couldn\'t be reached')}, so this is the copy saved${S.offline?.saved ? ' on ' + fdate(S.offline.saved) : ''}. Changes won't save until the connection is back. If you're on a work network, it may block the database; try your phone's data.</span><button class="btn sm" type="button" onclick="location.reload()">Try again</button></div>` : '';
   let html;
   if (a === 'dashboard') html = viewDashboard();
   else if (a === 'bikes') html = viewList('bike');
   else if (a === 'ledger') html = viewLedger();
-  else if (a === 'costs') html = viewCosts();
+  else if (a === 'costs' || a === 'portfolio') html = viewPortfolio();
   else if (a === 'vehicle') html = viewVehicle(b);
   else html = viewList('car');
-  const titles = { dashboard: 'Dashboard', cars: 'Cars', bikes: 'Bikes', ledger: 'Service ledger', costs: 'Costs' };
+  const titles = { dashboard: 'Dashboard', cars: 'Cars', bikes: 'Bikes', ledger: 'Service ledger', costs: 'Portfolio', portfolio: 'Portfolio' };
   document.title = (a === 'vehicle' ? vname(vById(b)) : titles[a] || 'Dashboard') + ' · Home Collection';
   $('#view').innerHTML = banner + html;
   wireView();
@@ -1214,6 +1421,11 @@ function wireView() {
   V.querySelectorAll('[data-log]').forEach(b => b.onclick = () => openReadingForm(vById(b.dataset.log)));
   V.querySelectorAll('[data-read]').forEach(b => b.onclick = () => { const r = S.readings.find(x => x.id === b.dataset.read); openReadingForm(vById(r.vehicle_id), r); });
   V.querySelectorAll('.lc').forEach(wireLine);
+  V.querySelectorAll('[data-pcur]').forEach(b => b.onclick = () => { PCUR = b.dataset.pcur; try { localStorage.setItem('hc-pcur', PCUR); } catch (e) {} render(); });
+  V.querySelectorAll('[data-add-comp]').forEach(b => b.onclick = () => openCompForm(vById(b.dataset.addComp)));
+  V.querySelectorAll('[data-comp]').forEach(b => b.onclick = () => { const c = S.comps.find(x => x.id === b.dataset.comp); if (S.editor) openCompForm(vById(c.vehicle_id), c); });
+  V.querySelectorAll('[data-fipe]').forEach(b => b.onclick = () => openFipeForm(vById(b.dataset.fipe)));
+  V.querySelectorAll('[data-vsrc]').forEach(b => b.onclick = async () => { const v = vById(current().b); const u = await db.from('vehicles').update({ value_source: b.dataset.vsrc }).eq('id', v.id).select().single(); if (u.error) return toast('Couldn\'t save: ' + u.error.message, true); S.vehicles = S.vehicles.map(x => x.id === v.id ? { ...x, ...u.data } : x); render(); if (b.dataset.vsrc === 'manual' && u.data.estimated_value == null) openVehicleForm(vById(v.id)); });
   const keep = (id, k) => { const el = $(id); if (!el) return; el.oninput = el.onchange = () => { LF[k] = el.value; const pos = el.selectionStart; render(); const n = $(id); n.focus(); if (pos != null && n.setSelectionRange) n.setSelectionRange(pos, pos); }; };
   keep('#lf-q', 'q'); keep('#lf-v', 'v'); keep('#lf-c', 'c'); keep('#lf-y', 'y');
   const c = $('#lf-clear'); if (c) c.onclick = () => { Object.keys(LF).forEach(k => LF[k] = ''); render(); };
