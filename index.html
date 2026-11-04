@@ -197,6 +197,16 @@ legend{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--f
 .skel{background:linear-gradient(90deg,var(--s1),var(--s2),var(--s1));background-size:200% 100%;animation:sk 1.2s linear infinite;border-radius:var(--r)}
 @keyframes sk{to{background-position:-200% 0}}
 
+/* login gate */
+body.locked .top, body.locked main, body.locked .panel, body.locked .scrim{display:none}
+.login{display:none;min-height:100vh;min-height:100dvh;place-items:center;padding:24px 16px}
+body.locked .login{display:grid}
+.login-card{width:min(400px,100%);background:var(--s1);border:1px solid var(--line);border-radius:16px;padding:32px 28px 28px}
+.login-ic{width:64px;height:64px;border-radius:15px;display:block;margin:0 0 20px}
+.login-card h1{font-size:30px}
+.login-card .sub{margin:6px 0 24px}
+.linkbtn{background:none;border:0;padding:4px;color:var(--fg2);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:13.5px}
+.linkbtn:hover{color:var(--fg)}
 /* dashboard */
 :root{--bar:#c4c5c9}
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:0 0 44px}
@@ -301,7 +311,7 @@ legend{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--f
 }
 </style>
 </head>
-<body>
+<body class="locked">
 <header class="top">
   <div class="top-in">
     <a class="brand" href="#/dashboard" aria-label="Home Collection — Dashboard"><img src="/icons/icon-192.png?v=3" alt=""><b>Home Collection</b></a>
@@ -319,6 +329,7 @@ legend{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--f
   </div>
 </header>
 
+<section id="login" class="login" aria-label="Sign in"><div class="login-card"><img class="login-ic" src="/icons/icon-192.png?v=3" alt=""><h1>Home Collection</h1></div></section>
 <main id="view" tabindex="-1"></main>
 
 <div class="scrim" id="scrim"></div>
@@ -391,6 +402,20 @@ function toast(msg, bad) {
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 2800);
 }
 
+/* ---------- private photos & invoices (signed links) ---------- */
+const SIGNED = {};
+const mediaPath = u => { const m = /\/object\/(?:public|sign|authenticated)\/media\/([^?]+)/.exec(u || ''); return m ? decodeURIComponent(m[1]) : null; };
+const media = u => { if (!u) return ''; const p = mediaPath(u); return p ? (SIGNED[p] || '') : u; };
+async function signMedia() {
+  if (!db) return;
+  const paths = [...new Set([...S.vehicles.map(v => v.photo_url), ...S.records.map(r => r.invoice_url)].map(mediaPath).filter(p => p && !SIGNED[p]))];
+  for (let i = 0; i < paths.length; i += 100) {
+    const { data, error } = await db.storage.from('media').createSignedUrls(paths.slice(i, i + 100), 7 * 24 * 3600);
+    if (error) { console.warn('Couldn\'t sign media links', error); return; }
+    (data || []).forEach(d => { if (d.signedUrl && d.path) SIGNED[d.path] = d.signedUrl; });
+  }
+}
+
 /* ---------- data ---------- */
 // Signed-out visitors may only read these columns (enforced by the database's column grants).
 const PUBLIC_COLS = {
@@ -423,6 +448,7 @@ async function load() {
     if (err) throw err;
     S.vehicles = v.data; S.records = sortRecs(r.data); S.readings = o.data; S.offline = null;
     if (!full) stripPrivate();
+    await signMedia();
     try { localStorage.setItem('hc-cache', JSON.stringify({ saved: new Date().toISOString().slice(0, 10), vehicles: v.data, records: r.data, readings: o.data })); } catch (e) {}
     setLive('live');
   } catch (e) { console.warn('Database unreachable, showing saved copy', e); await useSnapshot(/timed out/.test(e.message || '') ? 'the database didn\'t answer' : 'the database couldn\'t be reached'); return; }
@@ -431,10 +457,10 @@ async function load() {
 async function useSnapshot(reason) {
   let snap = null;
   try { snap = JSON.parse(localStorage.getItem('hc-cache') || 'null'); } catch (e) {}
-  if (!snap) { try { snap = await (await fetch('/data/snapshot.json', { cache: 'no-store' })).json(); } catch (e) {} }
   snap = snap || { vehicles: [], records: [], readings: [] };
   S.vehicles = snap.vehicles || []; S.records = sortRecs(snap.records || []); S.readings = snap.readings || [];
   S.offline = { reason, saved: snap.saved };
+  await signMedia().catch(() => {});
   if (!S.user) stripPrivate();
   setLive('offline'); render();
 }
@@ -446,17 +472,62 @@ function setLive(s) {
 }
 
 /* ---------- auth ---------- */
+// The whole app sits behind sign-in: no session -> login page, and nothing is fetched.
 async function refreshAuth(session) {
-  if (!db) return;
+  if (!db) { showLogin('The app couldn\'t start. Check your connection and reload the page.'); return; }
   if (session === undefined) session = (await db.auth.getSession()).data.session;
+  const prev = S.user?.id;
   S.user = session?.user || null;
-  S.editor = false;
-  if (S.user) {
-    const { data: ed } = await db.from('editors').select('email').eq('email', (S.user.email || '').toLowerCase());
-    S.editor = !!(ed && ed.length);
+  if (!S.user) {
+    S.editor = false; S.vehicles = []; S.records = []; S.readings = []; S.loadedFull = undefined;
+    window.live.state = 'loading'; Object.keys(SIGNED).forEach(k => delete SIGNED[k]);
+    try { localStorage.removeItem('hc-cache'); } catch (e) {}
+    showLogin(pendingLoginMsg); pendingLoginMsg = null; return;
   }
-  $('#acct-btn').textContent = S.user ? (S.editor ? 'Editing' : 'Signed in') : 'Sign in';
-  if (window.live.state !== 'loading' && S.loadedFull !== undefined && S.loadedFull !== !!S.user) { load(); return; } // fetch (or drop) the private fields
+  const { data: ed, error } = await db.from('editors').select('email').eq('email', (S.user.email || '').toLowerCase());
+  if (!error && !(ed && ed.length)) { pendingLoginMsg = 'This account doesn\'t have access to the collection.'; await db.auth.signOut({ scope: 'local' }); return; }
+  S.editor = true; // signed-in accounts are editors (sign-ups are limited to the editor list)
+  $('#acct-btn').textContent = 'Account';
+  enterApp();
+  if (prev !== S.user.id || window.live.state === 'loading') await load(); else render();
+}
+let loginMode = 'in', pendingLoginMsg = null;
+function showLogin(msg) {
+  document.body.classList.add('locked'); closePanel();
+  document.title = 'Sign in · Home Collection';
+  const up = loginMode === 'up';
+  $('#login').innerHTML = `<div class="login-card">
+    <img class="login-ic" src="/icons/icon-192.png?v=3" alt="">
+    <h1>Home Collection</h1>
+    <p class="sub">${up ? 'First visit? Choose a password for your editor email.' : 'Sign in to open the garage.'}</p>
+    <form id="auth-form" novalidate>
+      ${msg ? `<div class="form-err" role="alert">${esc(msg)}</div>` : ''}
+      ${field('email', 'Email', 'email', '', { required: true, ac: 'email' })}
+      ${field('pw', up ? 'New password' : 'Password', 'password', '', { required: true, help: up ? 'At least 6 characters.' : '', ac: up ? 'new-password' : 'current-password' })}
+      <button class="btn primary" type="submit" style="width:100%;height:44px;margin-top:4px">${up ? 'Create password and sign in' : 'Sign in'}</button>
+    </form>
+    <p style="text-align:center;margin:18px 0 0"><button type="button" class="linkbtn" id="login-mode">${up ? 'Already have a password? Sign in' : 'First time here? Create a password'}</button></p>
+  </div>`;
+  $('#login-mode').onclick = () => { loginMode = up ? 'in' : 'up'; showLogin(); };
+  setTimeout(() => $('#f-email')?.focus(), 30);
+  wireForm('#auth-form', {
+    email: v => !v ? 'Enter your email.' : !/^\S+@\S+\.\S+$/.test(v) ? 'Enter a full email, like name@example.com.' : '',
+    pw: v => !v ? 'Enter your password.' : (up && v.length < 6) ? 'Use at least 6 characters.' : ''
+  }, async vals => {
+    const btn = $('#auth-form button[type=submit]'); btn.disabled = true; btn.textContent = up ? 'Creating…' : 'Signing in…';
+    try {
+      const email = vals.email.trim().toLowerCase();
+      const res = up ? await db.auth.signUp({ email, password: vals.pw }) : await db.auth.signInWithPassword({ email, password: vals.pw });
+      if (res.error) throw new Error(authMsg(res.error));
+      if (up && !res.data.session) throw new Error(authMsg({ message: 'Email not confirmed' }));
+      loginMode = 'in'; // the auth listener opens the app
+    } finally { if (document.body.classList.contains('locked') && $('#auth-form button[type=submit]')) { const b = $('#auth-form button[type=submit]'); b.disabled = false; b.textContent = up ? 'Create password and sign in' : 'Sign in'; } }
+  });
+}
+function enterApp() {
+  if (!document.body.classList.contains('locked')) return;
+  document.body.classList.remove('locked'); $('#login').innerHTML = '';
+  if (!location.hash || location.hash === '#/') location.hash = '#/dashboard';
   render();
 }
 function authMsg(err) {
@@ -472,7 +543,8 @@ function authMsg(err) {
   return m || 'Something went wrong. Try again.';
 }
 function openAccount() {
-  if (S.user) {
+  if (!S.user) return showLogin();
+  {
     openPanel('Account', `
       <dl class="kv"><dt>Email</dt><dd>${esc(S.user.email)}</dd>
       <dt>Access</dt><dd>${S.editor ? 'Editor — you can add and change records' : 'View only — this email isn\'t on the editor list'}</dd></dl>
@@ -488,38 +560,8 @@ function openAccount() {
       if (error) throw new Error(authMsg(error));
       toast('Password saved'); closePanel();
     });
-    $('#so').onclick = async () => { await db.auth.signOut(); try { localStorage.removeItem('hc-cache'); } catch (e) {} closePanel(); toast('Signed out'); };
-    return;
+    $('#so').onclick = async () => { await db.auth.signOut(); try { localStorage.removeItem('hc-cache'); } catch (e) {} closePanel(); };
   }
-  let mode = 'in';
-  const draw = () => {
-    openPanel(mode === 'in' ? 'Sign in' : 'Create password', `
-      <div class="seg" role="group" aria-label="Sign-in mode">
-        <button type="button" data-m="in" aria-pressed="${mode==='in'}">Sign in</button>
-        <button type="button" data-m="up" aria-pressed="${mode==='up'}">Create password</button>
-      </div>
-      <p class="hint" style="margin:0 0 18px">${mode==='in' ? 'Editors sign in to add and change vehicles and service records. Anyone with the link can view.' : 'First visit? Choose a password for your editor email.'}</p>
-      <form id="auth-form" novalidate>
-        ${field('email', 'Email', 'email', '', { required:true, ac:'email' })}
-        ${field('pw', 'Password', 'password', '', { required:true, help: mode==='up' ? 'At least 6 characters.' : '', ac: mode==='up' ? 'new-password' : 'current-password' })}
-        <button class="btn primary" type="submit" style="width:100%">${mode==='in' ? 'Sign in' : 'Create password'}</button>
-      </form>`, '', { keepFocus: true });
-    document.querySelectorAll('.seg button').forEach(b => b.onclick = () => { mode = b.dataset.m; draw(); });
-    wireForm('#auth-form', {
-      email: v => !v ? 'Enter your email.' : !/^\S+@\S+\.\S+$/.test(v) ? 'Enter a full email, like name@example.com.' : '',
-      pw: v => !v ? 'Enter a password.' : (mode==='up' && v.length < 6) ? 'Use at least 6 characters.' : ''
-    }, async vals => {
-      if (!db) throw new Error('Couldn\'t reach the database. Check your connection and try again.');
-      const email = vals.email.trim().toLowerCase();
-      const res = mode === 'in'
-        ? await db.auth.signInWithPassword({ email, password: vals.pw })
-        : await db.auth.signUp({ email, password: vals.pw });
-      if (res.error) throw new Error(authMsg(res.error));
-      if (mode === 'up' && !res.data.session) throw new Error(authMsg({ message: 'Email not confirmed' }));
-      closePanel(); toast('Signed in'); refreshAuth();
-    });
-  };
-  draw();
 }
 
 /* ---------- panel ---------- */
@@ -621,7 +663,8 @@ async function upload(file, prefix) {
 /* ---------- views ---------- */
 function photo(v, eager) {
   const mk = esc(((v.make || '?')[0] + ((v.model || '')[0] || '')).toUpperCase());
-  return `<div class="ph">${v.photo_url ? `<img src="${esc(v.photo_url)}" alt="${esc(vname(v))}" ${eager ? '' : 'loading="lazy"'}>` : `<div class="mk" aria-hidden="true">${mk}</div>`}${v.status && v.status !== 'owned' ? `<span class="st chip light">${esc(STATUS[v.status])}</span>` : ''}</div>`;
+  const src = media(v.photo_url);
+  return `<div class="ph">${src ? `<img src="${esc(src)}" alt="${esc(vname(v))}" ${eager ? '' : 'loading="lazy"'}>` : `<div class="mk" aria-hidden="true">${mk}</div>`}${v.status && v.status !== 'owned' ? `<span class="st chip light">${esc(STATUS[v.status])}</span>` : ''}</div>`;
 }
 function viewList(kind) {
   const list = S.vehicles.filter(v => v.kind === kind);
@@ -783,7 +826,7 @@ function openVehicleForm(v, kind) {
   openPanel(isNew ? `Add ${word}` : 'Edit details', `
     <form id="v-form" novalidate>
       <fieldset><legend>Photo</legend>
-        ${v.photo_url ? `<img class="thumb" src="${esc(v.photo_url)}" alt="">` : ''}
+        ${media(v.photo_url) ? `<img class="thumb" src="${esc(media(v.photo_url))}" alt="">` : ''}
         ${field('photo', v.photo_url ? 'Replace photo' : 'Photo', 'file', '', { accept: 'image/*', help: 'A side or 3/4 view works best on the card.' })}
       </fieldset>
       <fieldset><legend>Basics</legend>
@@ -855,6 +898,7 @@ function openVehicleForm(v, kind) {
     const res = isNew ? await db.from('vehicles').insert(row).select().single() : await db.from('vehicles').update(row).eq('id', id).select().single();
     if (res.error) throw new Error('Couldn\'t save: ' + res.error.message);
     S.vehicles = isNew ? [...S.vehicles, res.data] : S.vehicles.map(x => x.id === id ? res.data : x);
+    await signMedia();
     closePanel(); toast(isNew ? `Added ${vshort(res.data)}` : 'Saved');
     if (isNew) location.hash = '#/vehicle/' + id; render();
   });
@@ -876,7 +920,7 @@ function openRecord(r) {
     </dl>
     ${r.items ? `<h2 style="font-size:14px">Work done</h2><p class="notes" style="margin-bottom:20px">${esc(r.items)}</p>` : ''}
     ${r.notes ? `<h2 style="font-size:14px">Notes</h2><p class="notes" style="margin-bottom:20px">${esc(r.notes)}</p>` : ''}
-    ${r.invoice_url ? `<a class="btn" href="${esc(r.invoice_url)}" target="_blank" rel="noopener">${ICON.file}Open invoice</a>` : ''}
+    ${media(r.invoice_url) ? `<a class="btn" href="${esc(media(r.invoice_url))}" target="_blank" rel="noopener">${ICON.file}Open invoice</a>` : ''}
     ${S.editor ? '' : (S.user ? '' : `<p style="margin-top:20px">${lockNote()}</p>`)}`,
     S.editor ? `<span class="sp"></span><button class="btn" type="button" id="r-edit">Edit</button>` : '');
   $('#panel-b').querySelectorAll('[data-close]').forEach(a => a.onclick = closePanel);
@@ -897,7 +941,7 @@ function openRecordForm(r, vehicleId) {
       ${field('shop', 'Shop or who did it', 'text', r.shop, { ph: 'Dealer, independent shop, DIY…' })}
       ${field('items', 'Parts and line items', 'textarea', r.items, { help: 'One per line works well.' })}
       ${field('confidence', 'Where the figures come from', 'select', r.confidence, { required: true, options: Object.entries(CONFIDENCE) })}
-      ${r.invoice_url ? `<p style="margin:0 0 8px"><a href="${esc(r.invoice_url)}" target="_blank" rel="noopener">Current invoice</a></p>` : ''}
+      ${media(r.invoice_url) ? `<p style="margin:0 0 8px"><a href="${esc(media(r.invoice_url))}" target="_blank" rel="noopener">Current invoice</a></p>` : ''}
       ${field('invoice', r.invoice_url ? 'Replace invoice' : 'Invoice', 'file', '', { accept: 'image/*,application/pdf', help: 'Photo or PDF.' })}
       ${field('notes', 'Notes', 'textarea', r.notes)}
       ${!isNew ? `<fieldset style="margin-top:8px"><legend>Delete</legend><div id="del-box"><button class="btn danger" type="button" id="del-r">Delete this record…</button></div></fieldset>` : ''}
@@ -931,6 +975,7 @@ function openRecordForm(r, vehicleId) {
     const res = isNew ? await db.from('service_records').insert(row).select().single() : await db.from('service_records').update(row).eq('id', r.id).select().single();
     if (res.error) throw new Error('Couldn\'t save: ' + res.error.message);
     S.records = sortRecs(isNew ? [res.data, ...S.records] : S.records.map(x => x.id === r.id ? res.data : x));
+    await signMedia();
     closePanel(); toast(isNew ? 'Record added' : 'Saved'); render();
   });
 }
@@ -1038,7 +1083,7 @@ function viewDashboard() {
   </dl>`;
   const shown = owned.filter(v => GF.k === 'all' || v.kind === GF.k);
   const garage = `<div class="garage-head"><h2>The garage</h2><div class="seg sm" role="group" aria-label="Show">${[['all', 'All'], ['car', 'Cars'], ['bike', 'Bikes']].map(([k, l]) => `<button type="button" data-garage="${k}" aria-pressed="${GF.k === k}">${l}</button>`).join('')}</div></div>
-    <div class="garage">${shown.map(v => `<a class="app" href="#/vehicle/${v.id}" title="${esc(vname(v))}"><span class="ic">${v.photo_url ? `<img src="${esc(v.photo_url)}" alt="" loading="lazy">` : `<span class="mk" aria-hidden="true">${esc(((v.make || '?')[0] + ((v.model || '')[0] || '')).toUpperCase())}</span>`}</span><span class="lb">${esc(vshort(v))}</span><span class="lb2">${esc(v.year || '')}${v.colour && owned.filter(x => x.make === v.make && x.model === v.model).length > 1 ? ' · ' + esc(v.colour) : ''}</span></a>`).join('')}</div>`;
+    <div class="garage">${shown.map(v => `<a class="app" href="#/vehicle/${v.id}" title="${esc(vname(v))}"><span class="ic">${media(v.photo_url) ? `<img src="${esc(media(v.photo_url))}" alt="" loading="lazy">` : `<span class="mk" aria-hidden="true">${esc(((v.make || '?')[0] + ((v.model || '')[0] || '')).toUpperCase())}</span>`}</span><span class="lb">${esc(vshort(v))}</span><span class="lb2">${esc(v.year || '')}${v.colour && owned.filter(x => x.make === v.make && x.model === v.model).length > 1 ? ' · ' + esc(v.colour) : ''}</span></a>`).join('')}</div>`;
   // charts
   const unitSeg = `<div class="seg sm" role="group" aria-label="Distance unit">${['mi', 'km'].map(u => `<button type="button" data-unit="${u}" aria-pressed="${distUnit === u}">${u}</button>`).join('')}</div>`;
   const top = driven.slice(0, 8);
@@ -1182,8 +1227,7 @@ window.addEventListener('hashchange', () => {
 });
 $('#acct-btn').onclick = openAccount;
 
-render();
-load();
+if (!db) showLogin('The app couldn\'t start. Check your connection and reload the page.');
 // Never call Supabase from inside onAuthStateChange: the library holds its auth lock while the
 // callback runs, so a getSession() or query there waits on itself forever and every request stalls.
 // Deferring with setTimeout lets the lock release first. (INITIAL_SESSION fires on subscribe.)
