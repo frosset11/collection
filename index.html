@@ -17,7 +17,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="/vendor/supabase-2.45.4.js"></script>
+<script>window.supabase || document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"><\/script>');</script>
 <style>
 :root{
   --bg:#121314; --s1:#18191b; --s2:#1f2023; --s3:#26282b;
@@ -335,7 +336,6 @@ legend{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--f
 /* ---------- config ---------- */
 const SUPA_URL = 'https://ftettbbdgivkbamonywf.supabase.co';
 const SUPA_KEY = 'sb_publishable_9jiNbL4oGDjaXOEstTlmzQ_ulmZMw2J';
-const SNAPSHOT = { vehicles: [], records: [] }; // shown if the database can't be reached
 
 const CATEGORIES = {
   maintenance:'Maintenance', repair:'Repair', restoration:'Restoration', modification:'Modification', parts:'Parts',
@@ -390,20 +390,30 @@ function toast(msg, bad) {
 
 /* ---------- data ---------- */
 async function load() {
-  if (!db) { useSnapshot(); return; }
+  if (!db) { await useSnapshot('the database library didn\'t load'); return; }
   try {
-    const [v, r, o] = await Promise.all([
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), 10000));
+    const [v, r, o] = await Promise.race([timeout, Promise.all([
       db.from('vehicles').select('*').order('sort_order').order('year', { ascending: false }),
       db.from('service_records').select('*').order('date', { ascending: false, nullsFirst: false }),
       db.from('odometer_readings').select('*').order('date', { ascending: false, nullsFirst: false })
-    ]);
+    ])]);
     if (v.error || r.error || o.error) throw (v.error || r.error || o.error);
-    S.vehicles = v.data; S.records = sortRecs(r.data); S.readings = o.data;
+    S.vehicles = v.data; S.records = sortRecs(r.data); S.readings = o.data; S.offline = null;
+    try { localStorage.setItem('hc-cache', JSON.stringify({ saved: new Date().toISOString().slice(0, 10), vehicles: v.data, records: r.data, readings: o.data })); } catch (e) {}
     setLive('live');
-  } catch (e) { console.warn('Database unreachable, showing snapshot', e); useSnapshot(); }
+  } catch (e) { console.warn('Database unreachable, showing saved copy', e); await useSnapshot(/timed out/.test(e.message || '') ? 'the database didn\'t answer' : 'the database couldn\'t be reached'); return; }
   render();
 }
-function useSnapshot() { S.vehicles = SNAPSHOT.vehicles.slice(); S.records = SNAPSHOT.records.slice(); setLive('offline'); render(); }
+async function useSnapshot(reason) {
+  let snap = null;
+  try { snap = JSON.parse(localStorage.getItem('hc-cache') || 'null'); } catch (e) {}
+  if (!snap) { try { snap = await (await fetch('/data/snapshot.json', { cache: 'no-store' })).json(); } catch (e) {} }
+  snap = snap || { vehicles: [], records: [], readings: [] };
+  S.vehicles = snap.vehicles || []; S.records = sortRecs(snap.records || []); S.readings = snap.readings || [];
+  S.offline = { reason, saved: snap.saved };
+  setLive('offline'); render();
+}
 function setLive(s) {
   window.live.state = s;
   window.live.counts = { vehicles: S.vehicles.length, records: S.records.length, readings: S.readings.length };
@@ -1086,7 +1096,7 @@ function render() {
   document.querySelectorAll('.tab').forEach(t => t.toggleAttribute('aria-current', false) || (t.dataset.r === tab && t.setAttribute('aria-current', 'page')));
   $('#n-cars').textContent = S.vehicles.filter(v => v.kind === 'car').length || '';
   $('#n-bikes').textContent = S.vehicles.filter(v => v.kind === 'bike').length || '';
-  const banner = window.live.state === 'offline' ? `<div class="banner">Couldn't reach the database, so this is the saved copy. Changes are paused until the connection is back.</div>` : '';
+  const banner = window.live.state === 'offline' ? `<div class="banner" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span>Offline: ${esc(S.offline?.reason || 'the database couldn\'t be reached')}, so this is the copy saved${S.offline?.saved ? ' on ' + fdate(S.offline.saved) : ''}. Changes won't save until the connection is back. If you're on a work network, it may block the database; try your phone's data.</span><button class="btn sm" type="button" onclick="location.reload()">Try again</button></div>` : '';
   let html;
   if (a === 'dashboard') html = viewDashboard();
   else if (a === 'bikes') html = viewList('bike');
