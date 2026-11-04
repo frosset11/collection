@@ -1306,7 +1306,7 @@ function marketSection(v) {
   const wmPrices = autoC.filter(c => c.include).map(c => +c.price);
   const wm = `<div class="wm"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
       <div style="min-width:0"><h3 style="font-size:14px;margin:0 0 4px">Webmotors listings</h3>
-        <p class="hint" style="margin:0">${v.market_checked ? `Searched "${esc(v.market_query || [v.make, v.model].filter(Boolean).join(' '))}"${(v.market_year_from ?? v.year) ? `, ${v.market_year_from ?? v.year}${(v.market_year_to ?? v.year) !== (v.market_year_from ?? v.year) ? '–' + (v.market_year_to ?? v.year) : ''}` : ''} on ${fdate(v.market_checked)} · ${esc(v.market_status || '')}` : (v.market_status ? esc(v.market_status) : 'Pull current asking prices for this model from Webmotors.')}</p>
+        <p class="hint" style="margin:0">${v.market_checked ? `Searched ${v.market_url ? 'your Webmotors link' : `"${esc(v.market_query || [v.make, v.model].filter(Boolean).join(' '))}"`}${v.market_must ? ` · must include "${esc(v.market_must)}"` : ''}${v.market_year_from || v.market_year_to ? `, ${v.market_year_from ?? ''}–${v.market_year_to ?? ''}` : ''} on ${fdate(v.market_checked)} · ${esc(v.market_status || '')}` : (v.market_status ? esc(v.market_status) : 'Pull current asking prices for this model from Webmotors.')}</p>
         ${wmPrices.length ? `<p style="margin:8px 0 0;font-size:14px">Median <b class="mono">${money(median(wmPrices), 0, 'BRL')}</b> <span class="hint">· range ${money(Math.min(...wmPrices), 0, 'BRL')}–${money(Math.max(...wmPrices), 0, 'BRL')} · ${wmPrices.length} used</span></p>` : ''}</div>
       ${S.editor ? `<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" type="button" data-wm-set="${v.id}">Search settings</button><button class="btn sm primary" type="button" data-wm-run="${v.id}">${v.market_checked ? 'Refresh' : 'Search Webmotors'}</button></div>` : ''}
     </div>
@@ -1369,10 +1369,12 @@ async function runWebmotors(v, quiet) {
 }
 function openMarketForm(v) {
   openPanel('Webmotors search', `
-    <p class="hint" style="margin:0 0 18px">${esc(vname(v))}. Listings must contain every word of the search (apart from the make) and fall inside the model years.</p>
+    <p class="hint" style="margin:0 0 18px">${esc(vname(v))}. Best results: search on Webmotors with the right make, model and version, then paste the link from your browser's address bar.</p>
     <form id="ms-form" novalidate>
-      ${field('market_query', 'Search', 'text', v.market_query || [v.make, v.model].filter(Boolean).join(' '), { required: true, help: 'Be specific: "Fiat 500 Abarth", "Honda CBX 1000", "BMW M2 Competition".' })}
-      <div class="two">${field('market_year_from', 'Model year from', 'text', v.market_year_from ?? v.year ?? '', { inputmode: 'numeric' })}${field('market_year_to', 'to', 'text', v.market_year_to ?? v.year ?? '', { inputmode: 'numeric' })}</div>
+      ${field('market_url', 'Webmotors search link', 'url', v.market_url, { ph: 'https://www.webmotors.com.br/carros/estoque/…', help: 'Recommended. When set, the search words below are ignored.' })}
+      ${field('market_query', 'Or search words', 'text', v.market_query || [v.make, v.model].filter(Boolean).join(' '), { help: 'Keep it broad, like "BMW M2" or "Fiat 500" — long phrases return nothing.' })}
+      ${field('market_must', 'Listing must include', 'text', v.market_must, { ph: 'Abarth, Competition…', help: 'Optional words every listing must contain, to drop other versions.' })}
+      <div class="two">${field('market_year_from', 'Model year from', 'text', v.market_year_from ?? (v.market_checked ? '' : v.year ?? ''), { inputmode: 'numeric' })}${field('market_year_to', 'to', 'text', v.market_year_to ?? (v.market_checked ? '' : v.year ?? ''), { inputmode: 'numeric' })}</div>
       <p class="hint" style="margin:0">Leave the years empty to accept any year. Each search costs about US$0.003 per listing on Apify.</p>
     </form>`,
     `<button class="btn" type="button" id="cancel">Cancel</button><button class="btn" type="button" id="ms-save">Save</button><button class="btn primary" type="button" data-submit>Save and search</button>`);
@@ -1380,8 +1382,11 @@ function openMarketForm(v) {
   const yr = x => x && (!/^\d{4}$/.test(x.trim())) ? 'Enter a 4-digit year, or leave it empty.' : '';
   let searchAfter = true;
   $('#ms-save').onclick = () => { searchAfter = false; $('#ms-form').requestSubmit(); };
-  wireForm('#ms-form', { market_query: x => !x.trim() ? 'Enter what to search for.' : '', market_year_from: yr, market_year_to: yr }, async f => {
-    const upd = { market_query: f.market_query.trim(), market_year_from: f.market_year_from ? +f.market_year_from : null, market_year_to: f.market_year_to ? +f.market_year_to : null };
+  wireForm('#ms-form', {
+    market_url: x => x && !/^https:\/\/(www\.)?webmotors\.com\.br\//i.test(x.trim()) ? 'Paste a link that starts with https://www.webmotors.com.br/' : '',
+    market_query: (x, f) => !x.trim() && !f.elements.market_url.value.trim() ? 'Paste a Webmotors link or enter search words.' : '',
+    market_year_from: yr, market_year_to: yr }, async f => {
+    const upd = { market_url: nz(f.market_url.trim()), market_must: nz(f.market_must.trim()), market_query: nz(f.market_query.trim()), market_year_from: f.market_year_from ? +f.market_year_from : null, market_year_to: f.market_year_to ? +f.market_year_to : null };
     if (upd.market_year_from && upd.market_year_to && upd.market_year_from > upd.market_year_to) throw new Error('"From" year is after the "to" year.');
     const u = await db.from('vehicles').update(upd).eq('id', v.id).select().single();
     if (u.error) throw new Error('Couldn\'t save: ' + u.error.message);
