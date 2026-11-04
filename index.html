@@ -196,10 +196,85 @@ legend{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--f
 .skel{background:linear-gradient(90deg,var(--s1),var(--s2),var(--s1));background-size:200% 100%;animation:sk 1.2s linear infinite;border-radius:var(--r)}
 @keyframes sk{to{background-position:-200% 0}}
 
+/* dashboard */
+:root{--bar:#c4c5c9}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin:0 0 44px}
+.kpis>div{background:var(--s1);padding:18px 20px 20px;min-width:0}
+.kpis dt{font-size:11px;color:var(--fg3);text-transform:uppercase;letter-spacing:.08em}
+.kpis dd{margin:8px 0 0;font-family:var(--mono);font-size:26px;letter-spacing:-.03em;line-height:1.2;overflow-wrap:anywhere}
+.kpis dd.sm{font-size:20px}
+.kpis small{display:block;font-family:var(--sans);font-size:12.5px;color:var(--fg3);margin-top:8px;letter-spacing:0;line-height:1.4}
+.garage-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.garage-head h2{margin:0}
+.seg.sm{margin:0;padding:2px;display:inline-flex}
+.seg.sm button{height:28px;padding:0 12px;font-size:12.5px;flex:none}
+.garage{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:24px 18px;margin-bottom:52px}
+.app{display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none;min-width:0}
+.app .ic{width:100%;aspect-ratio:1;border-radius:24%;overflow:hidden;background:var(--s2);border:1px solid var(--line);position:relative;transition:transform var(--t-med) var(--ease),border-color var(--t-med)}
+.app .ic img{width:100%;height:100%;object-fit:cover;display:block}
+.app .ic .mk{position:absolute;inset:0;display:grid;place-items:center;color:var(--line2);font-weight:700;font-size:30px;letter-spacing:-.04em}
+.app:hover .ic{transform:translateY(-2px);border-color:#4a4c51}
+.app .lb{font-size:12.5px;font-weight:500;text-align:center;line-height:1.25;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app .lb2{font-size:11px;color:var(--fg3);font-family:var(--mono);margin-top:-6px}
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.cc{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px 20px;min-width:0}
+.cc-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px}
+.cc-h h3{font-size:15px;font-weight:600;margin:0;letter-spacing:-.01em}
+.cc-h p{margin:3px 0 0;font-size:12.5px;color:var(--fg3)}
+.cc .tools{display:flex;gap:6px;flex-shrink:0;align-items:center}
+.cc .tbl{display:none}
+.cc.as-table .tbl{display:block}
+.cc.as-table .viz{display:none}
+.cc .tbl table{min-width:0}
+.cc .tbl td,.cc .tbl th{padding:8px 10px;font-size:13px}
+.cc .none{color:var(--fg3);font-size:13.5px;margin:8px 0}
+.hb{display:grid;grid-template-columns:minmax(0,150px) minmax(0,1fr) auto;gap:12px;align-items:center;padding:6px 0;text-decoration:none}
+.hb .l{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--fg2)}
+.hb .tr{height:12px;display:block}
+.hb .b{display:block;height:100%;background:var(--bar);border-radius:0 4px 4px 0;min-width:2px;transition:background var(--t-fast)}
+.hb .v{font-family:var(--mono);font-size:12.5px}
+.hb:hover .b{background:var(--fg)}
+.hb:hover .l{color:var(--fg)}
+.vb{position:relative;height:170px;display:flex;align-items:flex-end;gap:2px;margin-left:48px}
+.vb .g{position:absolute;left:0;right:0;border-top:1px solid var(--line);height:0}
+.vb .g span{position:absolute;right:calc(100% + 8px);top:-8px;white-space:nowrap;font-size:11px;color:var(--fg3);font-family:var(--mono)}
+.vb .col{flex:1;height:100%;display:flex;align-items:flex-end;justify-content:center;position:relative;z-index:1;cursor:default}
+.vb .bar{width:min(70%,34px);background:var(--bar);border-radius:4px 4px 0 0;transition:background var(--t-fast)}
+.vb .col:hover .bar{background:var(--fg)}
+.vx{display:flex;gap:2px;margin:8px 0 0 48px}
+.vx span{flex:1;text-align:center;font-size:11px;color:var(--fg3);font-family:var(--mono);overflow:hidden;white-space:nowrap}
+.lc{position:relative;height:210px;margin-left:56px}
+.lc svg{position:absolute;inset:0 0 24px 0;width:100%;height:calc(100% - 24px);overflow:visible}
+.lc .g{position:absolute;left:0;right:0;border-top:1px solid var(--line);height:0}
+.lc .g span{position:absolute;right:calc(100% + 8px);top:-8px;white-space:nowrap;font-size:11px;color:var(--fg3);font-family:var(--mono)}
+.lc .xl{position:absolute;bottom:0;font-size:11px;color:var(--fg3);font-family:var(--mono);transform:translateX(-50%);white-space:nowrap}
+.lc .xl.first{transform:none}.lc .xl.last{transform:translateX(-100%)}
+.lc .xh{position:absolute;top:0;bottom:24px;width:1px;background:var(--line2);display:none;pointer-events:none}
+.lc .dot{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--fg);box-shadow:0 0 0 2px var(--s1);transform:translate(-50%,-50%);display:none;pointer-events:none}
+.lc .hit{position:absolute;inset:0 0 24px 0;cursor:crosshair}
+.list{border-top:1px solid var(--line)}
+.li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);text-decoration:none;align-items:center}
+.li:hover .t{text-decoration:underline}
+.li .t{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li .m{font-size:12.5px;color:var(--fg3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li .r{font-family:var(--mono);font-size:12.5px;color:var(--fg2);text-align:right}
+#tip{position:fixed;z-index:70;background:var(--s3);border:1px solid var(--line2);color:var(--fg);padding:8px 10px;border-radius:var(--r-sm);font-size:12.5px;line-height:1.4;pointer-events:none;opacity:0;transition:opacity var(--t-fast);max-width:260px;white-space:pre-line;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+#tip.on{opacity:1}
+.vcharts{margin-top:48px}
+.rowbtn{cursor:pointer}
 @media (max-width:860px){
   .hero{grid-template-columns:1fr;gap:24px}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .charts{grid-template-columns:1fr}
 }
 @media (max-width:720px){
+  .kpis dd{font-size:20px}.kpis dd.sm{font-size:16px}
+  .kpis>div{padding:14px 14px 16px}
+  .garage{grid-template-columns:repeat(4,minmax(0,1fr));gap:18px 12px}
+  .app .ic .mk{font-size:20px}
+  .app .lb{font-size:11.5px}
+  .hb{grid-template-columns:minmax(0,104px) minmax(0,1fr) auto;gap:8px}
+  .cc{padding:16px}
   .top-in{height:auto;flex-wrap:wrap;padding:12px 16px 0;gap:10px}
   .brand{flex:1}
   .live span{display:none}
@@ -228,8 +303,9 @@ legend{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--f
 <body>
 <header class="top">
   <div class="top-in">
-    <a class="brand" href="#/cars" aria-label="Home Collection — Cars"><img src="/icons/icon-192.png?v=3" alt=""><b>Home Collection</b></a>
+    <a class="brand" href="#/dashboard" aria-label="Home Collection — Dashboard"><img src="/icons/icon-192.png?v=3" alt=""><b>Home Collection</b></a>
     <nav class="tabs" aria-label="Sections">
+      <a class="tab" href="#/dashboard" data-r="dashboard">Dashboard</a>
       <a class="tab" href="#/cars" data-r="cars">Cars<span class="n" id="n-cars"></span></a>
       <a class="tab" href="#/bikes" data-r="bikes">Bikes<span class="n" id="n-bikes"></span></a>
       <a class="tab" href="#/ledger" data-r="ledger">Service ledger</a>
@@ -253,6 +329,7 @@ legend{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--f
   <div class="panel-f" id="panel-f"></div>
 </aside>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="tip" role="tooltip"></div>
 
 <script>
 /* ---------- config ---------- */
@@ -438,7 +515,7 @@ document.addEventListener('keydown', e => {
     else if (!e.shiftKey && document.activeElement === f[f.length-1]) { e.preventDefault(); f[0].focus(); }
   }
   if (!open && !e.metaKey && !e.ctrlKey && !e.altKey && !/input|select|textarea/i.test(document.activeElement.tagName)) {
-    const map = { '1':'cars', '2':'bikes', '3':'ledger', '4':'costs' };
+    const map = { '1':'dashboard', '2':'cars', '3':'bikes', '4':'ledger', '5':'costs' };
     if (map[e.key]) location.hash = '#/' + map[e.key];
   }
 });
@@ -545,7 +622,7 @@ function viewVehicle(id) {
     ['Engine', v.engine], ['Transmission', v.transmission], ['Drivetrain', v.drivetrain], ['Power', v.power], ['Plate', v.plate], ['Kept at', v.location]
   ].filter(x => x[1] != null && x[1] !== '');
   const own = [
-    ['Purchased', fdate(v.purchase_date)], ['Price paid', money(v.purchase_price, 0, v.currency), 1], ['Currency', CURRENCIES[v.currency]], ['Bought from', v.purchased_from],
+    ['Purchased', fdate(v.purchase_date)], ['Price paid', money(v.purchase_price, 0, v.currency), 1], ['Estimated value', v.estimated_value != null ? money(v.estimated_value, 0, v.currency) + (v.value_date ? ' (' + fdate(v.value_date) + ')' : '') : null, 1], ['Currency', CURRENCIES[v.currency]], ['Bought from', v.purchased_from],
     ['Co-owners', v.co_owners], ['Status', STATUS[v.status]],
     ...(v.status === 'sold' ? [['Sold', fdate(v.sold_date)], ['Sale price', money(v.sold_price, 0, v.currency), 1]] : []),
     ['Latest reading', (v.odometer != null || v.hours != null) ? readingStr(v.odometer, v.odometer_unit, v.hours) + (v.odometer_date ? ' (' + fdate(v.odometer_date) + ')' : '') : null, 1]
@@ -560,15 +637,18 @@ function viewVehicle(id) {
         ${v.nickname ? `<p class="sub">${esc(v.nickname)}</p>` : ''}
         <dl class="stats">
           <div><dt>${v.meter === 'hours' ? 'Hours' : 'Odometer'}</dt><dd>${v.meter === 'hours' ? (v.hours != null ? (+v.hours).toLocaleString('en-US') + ' <small>h</small>' : '—') : v.odometer != null ? num(v.odometer) + ` <small>${v.odometer_unit}</small>` + (v.meter === 'both' && v.hours != null ? ` <small>· ${(+v.hours).toLocaleString('en-US')} h</small>` : '') : '—'}</dd></div>
+          <div><dt>${v.meter === 'hours' ? 'Hours' : 'Driven'} in ${YEAR}</dt><dd>${v.meter === 'hours' ? yHours(v) : (d => d ? Math.round(d).toLocaleString('en-US') + ` <small>${v.odometer_unit}</small>` : '—')(drivenIn(v, YEAR, v.odometer_unit))}</dd></div>
           <div><dt>Paid</dt><dd>${money(v.purchase_price, 0, v.currency)}</dd></div>
+          <div><dt>Estimated value</dt><dd>${v.estimated_value != null ? money(v.estimated_value, 0, v.currency) : (S.editor ? `<button class="btn sm" type="button" data-edit-v="${v.id}">Add estimate</button>` : '—')}</dd></div>
           <div><dt>Service & parts</dt><dd>${msum(sp)}</dd></div>
           <div><dt>Total in</dt><dd>${msum(addSums(paid(v), sp))}</dd></div>
           <div><dt>Owned</dt><dd>${owned != null ? (owned >= 365 ? (owned / 365).toFixed(1) + ' <small>yrs</small>' : owned + ' <small>days</small>') : '—'}</dd></div>
           <div><dt>Records</dt><dd>${recs.length}</dd></div>
         </dl>
-        <div class="actions">${S.editor ? `<button class="btn primary" type="button" data-add-r="${v.id}">${ICON.plus}Add service</button><button class="btn" type="button" data-edit-v="${v.id}">Edit details</button>` : (S.user ? '' : lockNote())}</div>
+        <div class="actions">${S.editor ? `<button class="btn primary" type="button" data-add-r="${v.id}">${ICON.plus}Add service</button><button class="btn" type="button" data-log="${v.id}">${ICON.plus}Log reading</button><button class="btn" type="button" data-edit-v="${v.id}">Edit details</button>` : (S.user ? '' : lockNote())}</div>
       </div>
     </div>
+    ${vehicleCharts(v)}
     <div class="section"><h2>Specifications</h2>${dl(spec)}</div>
     <div class="section"><h2>Ownership</h2>${dl(own)}</div>
     ${v.notes ? `<div class="section"><h2>Notes</h2><p class="notes">${esc(v.notes)}</p></div>` : ''}
@@ -576,13 +656,33 @@ function viewVehicle(id) {
       <div class="section-head"><h2>Service history</h2>${recs.length ? `<span class="hint">${recs.length} record${recs.length === 1 ? '' : 's'} · ${msum(sp, 1)}</span>` : ''}</div>
       ${recs.length ? rowsHtml(recs, false) : `<div class="empty"><h2>No service records yet</h2><p>Add work as it happens, or send invoices and they'll be entered here.</p>${S.editor ? `<button class="btn primary" type="button" data-add-r="${v.id}">${ICON.plus}Add service</button>` : ''}</div>`}
     </div>
-    ${reads.length ? `<div class="section">
+    ${reads.length || S.editor ? `<div class="section">
       <div class="section-head"><h2>${v.meter === 'hours' ? 'Hour log' : 'Mileage log'}</h2><span class="hint">${reads.length} reading${reads.length === 1 ? '' : 's'}</span></div>
-      <div class="rows">${reads.slice(0, readLimit[id] || 8).map(r => `<div class="row" style="cursor:default"><span class="d">${r.date ? fdate(r.date) : 'Undated'}</span><span class="tm"><span class="t" style="display:block">${readingStr(r.odometer, r.unit, r.hours)}</span><span class="m" style="display:block">${esc(r.notes || '')}</span></span><span class="mi"></span><span class="a"></span></div>`).join('')}</div>
+      <div class="rows">${reads.slice(0, readLimit[id] || 8).map(r => S.editor
+        ? `<button class="row" type="button" data-read="${r.id}"><span class="d">${r.date ? fdate(r.date) : 'Undated'}</span><span class="tm"><span class="t" style="display:block">${readingStr(r.odometer, r.unit, r.hours)}</span><span class="m" style="display:block">${esc(r.notes || '')}</span></span><span class="mi"></span><span class="a hint">Edit</span></button>`
+        : `<div class="row" style="cursor:default"><span class="d">${r.date ? fdate(r.date) : 'Undated'}</span><span class="tm"><span class="t" style="display:block">${readingStr(r.odometer, r.unit, r.hours)}</span><span class="m" style="display:block">${esc(r.notes || '')}</span></span><span class="mi"></span><span class="a"></span></div>`).join('')}</div>
       ${reads.length > (readLimit[id] || 8) ? `<button class="btn sm" type="button" data-more-reads="${id}" style="margin-top:12px">Show all ${reads.length}</button>` : ''}
+      ${!reads.length ? `<div class="empty"><h2>No readings yet</h2><p>Log the ${v.meter === 'hours' ? 'hour meter' : 'odometer'} whenever you check it to build a usage history.</p><button class="btn primary" type="button" data-log="${v.id}">${ICON.plus}Log reading</button></div>` : ''}
     </div>` : ''}`;
 }
 const readLimit = {};
+function yHours(v) { const p = hourPoints(v), y = String(YEAR), b = p.filter(x => x.d < y), i = p.filter(x => x.d.startsWith(y)); if (!i.length) return '—'; const d = Math.max(...i.map(x => x.o)) - (b.length ? b[b.length - 1].o : i[0].o); return d > 0 ? d.toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' <small>h</small>' : '—'; }
+function vehicleCharts(v) {
+  const hoursOnly = v.meter === 'hours';
+  const pts = hoursOnly ? hourPoints(v) : pointsFor(v).map(p => ({ d: p.d, o: Math.round(conv(p.o, p.u, v.odometer_unit)) }));
+  const ded = []; pts.forEach(p => { const last = ded[ded.length - 1]; if (last && last.d === p.d) last.o = Math.max(last.o, p.o); else ded.push({ ...p }); });
+  const unit = hoursOnly ? 'h' : v.odometer_unit;
+  const c1 = chartCard(hoursOnly ? 'Engine hours over time' : 'Odometer over time', `${ded.length} dated reading${ded.length === 1 ? '' : 's'} from the log and service history`,
+    lineChart(ded, n => short(n), unit), [['Date', hoursOnly ? 'Hours' : `Odometer (${unit})`], ...ded.slice().reverse().map(p => [fdate(p.d), (+p.o).toLocaleString('en-US')])]);
+  const recs = recsFor(v.id), cur = v.currency || 'USD';
+  const ys = recs.filter(r => r.date).map(r => +r.date.slice(0, 4));
+  const first = Math.max(ys.length ? Math.min(...ys) : YEAR, YEAR - 9), years = Array.from({ length: YEAR - first + 1 }, (_, i) => first + i);
+  const items = spendByYear(recs, cur, years), anySpend = items.some(i => i.value);
+  const other = recs.some(r => r.currency !== cur && +r.amount);
+  const c2 = chartCard(`Service spend by year (${SYM[cur]})`, other ? `Only ${SYM[cur]} amounts; see the history for others` : `${years[0]}–${YEAR}`,
+    anySpend ? vbars(items, n => SYM[cur] + short(n)) : '<p class="none">No service costs recorded yet.</p>', anySpend ? [['Year', `Spend (${SYM[cur]})`, 'Records'], ...items.map(i => [String(i.year), money(i.value, 0, cur), String(i.n)])] : null);
+  return `<div class="charts vcharts">${c1}${c2}</div>`;
+}
 function rowsHtml(recs, showVehicle) {
   return `<div class="rows">${recs.map(r => {
     const v = vById(r.vehicle_id);
@@ -671,6 +771,7 @@ function openVehicleForm(v, kind) {
       <fieldset><legend>Ownership</legend>
         <div class="two">${field('purchase_price', 'Purchase price', 'text', v.purchase_price ?? '', { inputmode: 'decimal' })}${field('currency', 'Currency', 'select', v.currency, { required: true, options: Object.entries(CURRENCIES) })}</div>
         ${field('purchase_date', 'Purchase date', 'date', v.purchase_date)}
+        <div class="two">${field('estimated_value', 'Estimated value today', 'text', v.estimated_value ?? '', { inputmode: 'decimal', help: 'Same currency. Used for collection value.' })}${field('value_date', 'Valued on', 'date', v.value_date)}</div>
         ${field('purchased_from', 'Bought from', 'text', v.purchased_from, { ph: 'Dealer, private sale, auction…' })}
         ${field('co_owners', 'Co-owners', 'text', v.co_owners, { help: 'Leave blank if it\'s only yours.' })}
         ${field('status', 'Status', 'select', v.status, { required: true, options: Object.entries(STATUS) })}
@@ -701,6 +802,7 @@ function openVehicleForm(v, kind) {
     odometer: intRule('Odometer'),
     purchase_price: moneyRule('Purchase price'),
     sold_price: moneyRule('Sale price'),
+    estimated_value: moneyRule('Estimated value'),
     photo: f => f && f[0] && !/^image\//.test(f[0].type) ? 'Choose an image file (JPG, PNG or HEIC).' : ''
   }, async f => {
     const id = v.id || crypto.randomUUID();
@@ -710,7 +812,7 @@ function openVehicleForm(v, kind) {
       transmission: nz(f.transmission.trim()), drivetrain: nz(f.drivetrain.trim()), plate: nz(f.plate.trim()), location: nz(f.location.trim()),
       odometer: nInt(f.odometer), odometer_unit: f.odometer_unit, odometer_date: nz(f.odometer_date),
       purchase_date: nz(f.purchase_date), purchase_price: nMoney(f.purchase_price), purchased_from: nz(f.purchased_from.trim()),
-      co_owners: nz(f.co_owners.trim()), status: f.status, sold_date: f.status === 'sold' ? nz(f.sold_date) : null,
+      co_owners: nz(f.co_owners.trim()), status: f.status, estimated_value: nMoney(f.estimated_value), value_date: nz(f.value_date) || (f.estimated_value && f.estimated_value != (v.estimated_value ?? '') ? new Date().toISOString().slice(0, 10) : nz(f.value_date)), sold_date: f.status === 'sold' ? nz(f.sold_date) : null,
       sold_price: f.status === 'sold' ? nMoney(f.sold_price) : null, notes: nz(f.notes.trim())
     };
     if (f.photo && f.photo[0]) row.photo_url = await upload(await shrinkImage(f.photo[0]), `vehicles/${id}`);
@@ -797,8 +899,187 @@ function openRecordForm(r, vehicleId) {
   });
 }
 
+/* ---------- charts ---------- */
+const YEAR = new Date().getFullYear();
+const KM_MI = 0.621371;
+let distUnit = (() => { try { return localStorage.getItem('hc-unit') || 'mi'; } catch (e) { return 'mi'; } })();
+const GF = { k: 'all' };
+const conv = (o, u, to) => u === to ? o : to === 'mi' ? o * KM_MI : o / KM_MI;
+function pointsFor(v) {
+  const p = [];
+  S.readings.filter(r => r.vehicle_id === v.id && r.date && r.odometer != null).forEach(r => p.push({ d: r.date, o: +r.odometer, u: r.unit }));
+  recsFor(v.id).filter(r => r.date && r.mileage != null).forEach(r => p.push({ d: r.date, o: +r.mileage, u: v.odometer_unit }));
+  if (v.odometer != null && v.odometer_date) p.push({ d: v.odometer_date, o: +v.odometer, u: v.odometer_unit });
+  return p.sort((a, b) => a.d.localeCompare(b.d));
+}
+function hourPoints(v) {
+  const p = S.readings.filter(r => r.vehicle_id === v.id && r.date && r.hours != null).map(r => ({ d: r.date, o: +r.hours }));
+  recsFor(v.id).filter(r => r.date && r.hours != null).forEach(r => p.push({ d: r.date, o: +r.hours }));
+  if (v.hours != null && v.odometer_date) p.push({ d: v.odometer_date, o: +v.hours });
+  return p.sort((a, b) => a.d.localeCompare(b.d));
+}
+function drivenIn(v, year, to) {
+  const y = String(year), p = pointsFor(v).map(x => ({ d: x.d, o: conv(x.o, x.u, to) }));
+  const before = p.filter(x => x.d < y + '-01-01'), inY = p.filter(x => x.d.startsWith(y));
+  if (!inY.length) return 0;
+  const base = before.length ? before[before.length - 1].o : inY[0].o;
+  return Math.max(0, Math.max(...inY.map(x => x.o)) - base);
+}
+const niceMax = v => { if (v <= 0) return 1; const e = 10 ** Math.floor(Math.log10(v)), m = v / e; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * e; };
+const short = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'M' : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1).replace(/\.0$/, '') + 'k' : String(Math.round(n));
+const SYM = { BRL: 'R$', USD: 'US$' };
+function chartCard(title, sub, viz, rows, tools = '') {
+  const tbl = rows && rows.length > 1 ? `<div class="tbl"><div class="tbl-wrap"><table><thead><tr>${rows[0].map((h, i) => `<th scope="col"${i ? ' class="n"' : ''}>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.slice(1).map(r => `<tr>${r.map((c, i) => `<td${i ? ' class="n"' : ''}>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>` : '';
+  return `<section class="cc"><div class="cc-h"><div><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ''}</div><div class="tools">${tools}${tbl ? '<button class="btn sm" type="button" data-table aria-pressed="false">Table</button>' : ''}</div></div><div class="viz">${viz}</div>${tbl}</section>`;
+}
+function hbars(items, fmt) {
+  const max = Math.max(...items.map(i => i.value), 1);
+  return `<div>${items.map(i => `<a class="hb" href="${i.href}" data-tip="${esc(i.tip)}"><span class="l">${esc(i.label)}</span><span class="tr"><span class="b" style="width:${(i.value / max * 100).toFixed(2)}%"></span></span><span class="v">${fmt(i.value)}</span></a>`).join('')}</div>`;
+}
+function vbars(items, axis) {
+  const max = niceMax(Math.max(...items.map(i => i.value), 0));
+  return `<div class="vb" aria-hidden="true">${[1, .5, 0].map(f => `<div class="g" style="bottom:${f * 100}%"><span>${axis(max * f)}</span></div>`).join('')}${items.map(i => `<div class="col" data-tip="${esc(i.tip)}"><div class="bar" style="height:${(i.value / max * 100).toFixed(2)}%"></div></div>`).join('')}</div><div class="vx">${items.map(i => `<span>${esc(i.label)}</span>`).join('')}</div>`;
+}
+const LINES = {}; let lineN = 0;
+function lineChart(pts, fmtY, unitLabel) {
+  if (pts.length < 2) return `<p class="none">Log at least two readings to see a trend.</p>`;
+  const t = pts.map(p => Date.parse(p.d)), t0 = Math.min(...t), t1 = Math.max(...t) || t0 + 1;
+  let lo = Math.min(...pts.map(p => p.o)), hi = Math.max(...pts.map(p => p.o));
+  const pad = (hi - lo) * .08 || 1; lo = Math.max(0, lo - pad); hi += pad;
+  const X = ti => (t1 === t0 ? 50 : (ti - t0) / (t1 - t0) * 100), Y = o => 100 - (o - lo) / (hi - lo) * 100;
+  const id = 'lc' + (++lineN);
+  LINES[id] = pts.map((p, i) => ({ x: X(t[i]), y: Y(p.o), d: p.d, o: p.o }));
+  const path = LINES[id].map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+  const y0 = new Date(t0).getFullYear(), y1 = new Date(t1).getFullYear();
+  const xl = y0 === y1 ? [[0, fdate(pts[0].d), 'first'], [100, fdate(pts[pts.length - 1].d), 'last']] : [[0, y0, 'first'], [100, y1, 'last'], ...(y1 - y0 > 2 ? [[X(Date.parse(Math.round((y0 + y1) / 2) + '-01-01')), Math.round((y0 + y1) / 2), '']] : [])];
+  return `<div class="lc" id="${id}" data-unit="${esc(unitLabel)}">
+    ${[0, .5, 1].map(f => `<div class="g" style="top:calc(${f} * (100% - 24px))"><span>${fmtY(hi - (hi - lo) * f)}</span></div>`).join('')}
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="${path}" fill="none" stroke="var(--fg)" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    ${xl.map(([x, l, c]) => `<span class="xl ${c}" style="left:${x}%">${esc(l)}</span>`).join('')}
+    <div class="xh"></div><div class="dot"></div><div class="hit"></div></div>`;
+}
+function wireLine(el) {
+  const pts = LINES[el.id]; if (!pts) return;
+  const hit = el.querySelector('.hit'), xh = el.querySelector('.xh'), dot = el.querySelector('.dot'), h = () => hit.getBoundingClientRect().height;
+  const show = e => {
+    const r = hit.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width * 100;
+    const p = pts.reduce((a, b) => Math.abs(b.x - fx) < Math.abs(a.x - fx) ? b : a);
+    xh.style.left = p.x + '%'; xh.style.display = 'block';
+    dot.style.left = p.x + '%'; dot.style.top = (p.y / 100 * h()) + 'px'; dot.style.display = 'block';
+    showTip(`${fdate(p.d)}\n${(+p.o).toLocaleString('en-US')} ${el.dataset.unit}`, e.clientX, e.clientY);
+  };
+  hit.addEventListener('pointermove', show); hit.addEventListener('pointerdown', show);
+  hit.addEventListener('pointerleave', () => { xh.style.display = dot.style.display = 'none'; hideTip(); });
+}
+const tipEl = () => document.getElementById('tip');
+function showTip(text, x, y) { const t = tipEl(); t.textContent = text; t.classList.add('on'); const w = t.offsetWidth, hh = t.offsetHeight; t.style.left = Math.min(innerWidth - w - 8, Math.max(8, x + 14)) + 'px'; t.style.top = Math.max(8, y - hh - 12) + 'px'; }
+function hideTip() { tipEl().classList.remove('on'); }
+document.addEventListener('pointermove', e => { const t = e.target.closest && e.target.closest('[data-tip]'); if (t) showTip(t.dataset.tip, e.clientX, e.clientY); else if (!e.target.closest || !e.target.closest('.hit')) hideTip(); });
+addEventListener('scroll', hideTip, { passive: true });
+
+function spendByYear(recs, cur, years) {
+  return years.map(y => { const l = recs.filter(r => r.currency === cur && (r.date || '').startsWith(y)); const v = l.reduce((a, r) => a + (+r.amount || 0), 0); return { label: "'" + String(y).slice(2), year: y, value: v, n: l.length, tip: `${y}: ${money(v, 0, cur)} across ${l.length} record${l.length === 1 ? '' : 's'}` }; });
+}
+function viewDashboard() {
+  const head = `<div class="head"><div><p class="eyebrow">Home Collection</p><h1>Garage</h1></div>${S.editor ? `<button class="btn primary" type="button" data-add-v="car">${ICON.plus}Add vehicle</button>` : (S.user ? '' : lockNote())}</div>`;
+  if (window.live.state === 'loading') return head + `<div class="skel" style="height:110px;margin-bottom:44px"></div><div class="garage">${'<div class="skel" style="aspect-ratio:1;border-radius:24%"></div>'.repeat(12)}</div>`;
+  if (!S.vehicles.length) return head + `<div class="empty"><h2>Your garage is empty</h2><p>Add a car or a bike and it shows up here as a tile.</p>${S.editor ? `<button class="btn primary" type="button" data-add-v="car">${ICON.plus}Add vehicle</button>` : `<button class="btn" type="button" data-signin>Sign in to add vehicles</button>`}</div>`;
+  const owned = S.vehicles.filter(v => v.status !== 'sold');
+  const cars = owned.filter(v => v.kind === 'car').length, bikes = owned.length - cars;
+  const value = addSums(...owned.map(v => v.estimated_value != null ? { [v.currency || 'USD']: +v.estimated_value } : paid(v)));
+  const valued = owned.filter(v => v.estimated_value != null).length;
+  const yRecs = S.records.filter(r => (r.date || '').startsWith(YEAR));
+  const ySpend = sumBy(yRecs);
+  const driven = owned.map(v => ({ v, d: drivenIn(v, YEAR, distUnit) })).filter(x => x.d >= 1).sort((a, b) => b.d - a.d);
+  const totalDriven = driven.reduce((a, x) => a + x.d, 0);
+  const kpis = `<dl class="kpis">
+    <div><dt>Vehicles</dt><dd>${owned.length}</dd><small>${cars} car${cars === 1 ? '' : 's'} · ${bikes} bike${bikes === 1 ? '' : 's'}</small></div>
+    <div><dt>Collection value</dt><dd class="sm">${msum(value).replace(' + ', '<br>')}</dd><small>${valued ? `${valued} estimated, ${owned.length - valued} at purchase price` : 'At purchase price — add estimates under Edit details'}</small></div>
+    <div><dt>Service in ${YEAR}</dt><dd class="sm">${msum(ySpend).replace(' + ', '<br>')}</dd><small>${yRecs.length} record${yRecs.length === 1 ? '' : 's'}</small></div>
+    <div><dt>Driven in ${YEAR}</dt><dd>${Math.round(totalDriven).toLocaleString('en-US')} <span style="font-size:.6em;color:var(--fg3)">${distUnit}</span></dd><small>${driven.length} vehicle${driven.length === 1 ? '' : 's'} with readings this year</small></div>
+  </dl>`;
+  const shown = owned.filter(v => GF.k === 'all' || v.kind === GF.k);
+  const garage = `<div class="garage-head"><h2>The garage</h2><div class="seg sm" role="group" aria-label="Show">${[['all', 'All'], ['car', 'Cars'], ['bike', 'Bikes']].map(([k, l]) => `<button type="button" data-garage="${k}" aria-pressed="${GF.k === k}">${l}</button>`).join('')}</div></div>
+    <div class="garage">${shown.map(v => `<a class="app" href="#/vehicle/${v.id}" title="${esc(vname(v))}"><span class="ic">${v.photo_url ? `<img src="${esc(v.photo_url)}" alt="" loading="lazy">` : `<span class="mk" aria-hidden="true">${esc(((v.make || '?')[0] + ((v.model || '')[0] || '')).toUpperCase())}</span>`}</span><span class="lb">${esc(vshort(v))}</span><span class="lb2">${esc(v.year || '')}${v.colour && owned.filter(x => x.make === v.make && x.model === v.model).length > 1 ? ' · ' + esc(v.colour) : ''}</span></a>`).join('')}</div>`;
+  // charts
+  const unitSeg = `<div class="seg sm" role="group" aria-label="Distance unit">${['mi', 'km'].map(u => `<button type="button" data-unit="${u}" aria-pressed="${distUnit === u}">${u}</button>`).join('')}</div>`;
+  const top = driven.slice(0, 8);
+  const c1 = chartCard(`Most driven in ${YEAR}`, `Distance from logged readings, in ${distUnit === 'mi' ? 'miles' : 'kilometres'}`,
+    top.length ? hbars(top.map(x => ({ label: vshort(x.v) + (x.v.colour && owned.filter(y => y.make === x.v.make && y.model === x.v.model).length > 1 ? ' ' + x.v.colour : ''), value: x.d, href: '#/vehicle/' + x.v.id, tip: `${vname(x.v)}\n${Math.round(x.d).toLocaleString('en-US')} ${distUnit} in ${YEAR}` })), v => Math.round(v).toLocaleString('en-US') + ' ' + distUnit) : `<p class="none">No readings logged in ${YEAR} yet. Use Log reading on a vehicle's page.</p>`,
+    [['Vehicle', `Distance (${distUnit})`], ...driven.map(x => [vname(x.v), Math.round(x.d).toLocaleString('en-US')])], unitSeg);
+  const years = Array.from({ length: 8 }, (_, i) => YEAR - 7 + i);
+  const spendCards = ['BRL', 'USD'].filter(c => S.records.some(r => r.currency === c && +r.amount)).map(cur => {
+    const items = spendByYear(S.records, cur, years);
+    return chartCard(`Service spend by year (${SYM[cur]})`, `${years[0]}–${YEAR}, all vehicles`, vbars(items, n => SYM[cur] + short(n)), [['Year', `Spend (${SYM[cur]})`, 'Records'], ...items.map(i => [String(i.year), money(i.value, 0, cur), String(i.n)])]);
+  });
+  const dec = {}; owned.forEach(v => { const k = v.year ? Math.floor(v.year / 10) * 10 : 'Unknown'; (dec[k] = dec[k] || []).push(v); });
+  const decKeys = Object.keys(dec).filter(k => k !== 'Unknown').map(Number).sort((a, b) => a - b);
+  const decItems = decKeys.map(k => ({ label: `'${String(k).slice(2)}s`, full: `${k}s`, value: dec[k].length, tip: `${k}s: ${dec[k].length} vehicle${dec[k].length === 1 ? '' : 's'}\n${dec[k].map(vshort).join(', ')}` }));
+  const c3 = chartCard('The collection by decade', `Model year${dec.Unknown ? ` · ${dec.Unknown.length} without a year not shown` : ''}`, vbars(decItems, n => String(Math.round(n))),
+    [['Decade', 'Vehicles'], ...decItems.map(i => [i.full, String(i.value)]), ...(dec.Unknown ? [['Year unknown', String(dec.Unknown.length)]] : [])]);
+  const now = Date.now();
+  const lastSvc = v => recsFor(v.id).find(r => r.date && r.category !== 'other' && r.category !== 'registration')?.date;
+  const att = owned.map(v => ({ v, d: lastSvc(v) })).filter(x => !x.d || now - Date.parse(x.d) > 365 * 864e5).sort((a, b) => (a.d || '').localeCompare(b.d || ''));
+  const ago = d => { const m = Math.round((now - Date.parse(d)) / (30.44 * 864e5)); return m >= 24 ? `${Math.floor(m / 12)} years ago` : `${m} months ago`; };
+  const c4 = `<section class="cc"><div class="cc-h"><div><h3>Needs attention</h3><p>${att.length} vehicle${att.length === 1 ? '' : 's'} with no service logged in the last 12 months</p></div></div>
+    <div class="list">${att.slice(0, 8).map(x => `<a class="li" href="#/vehicle/${x.v.id}"><span style="min-width:0"><span class="t" style="display:block">${esc(vname(x.v))}</span><span class="m" style="display:block">${x.d ? 'Last service ' + fdate(x.d) : 'No service logged'}</span></span><span class="r">${x.d ? ago(x.d) : '—'}</span></a>`).join('') || '<p class="none">Everything has been serviced in the last year.</p>'}</div>
+    ${att.length > 8 ? `<p class="hint" style="margin:12px 0 0">and ${att.length - 8} more</p>` : ''}</section>`;
+  const recent = S.records.filter(r => r.date).slice(0, 6);
+  const c5 = `<section class="cc"><div class="cc-h"><div><h3>Recent service</h3><p>Latest entries in the ledger</p></div><a class="btn sm" href="#/ledger">Ledger</a></div>
+    <div class="list">${recent.map(r => `<a class="li" href="#/vehicle/${r.vehicle_id}"><span style="min-width:0"><span class="t" style="display:block">${esc(r.title)}</span><span class="m" style="display:block">${esc(vname(vById(r.vehicle_id)))} · ${fdate(r.date)}</span></span><span class="r">${r.amount != null ? money(r.amount, 0, r.currency) : '—'}</span></a>`).join('')}</div></section>`;
+  return head + kpis + garage + `<div class="charts">${c1}${c3}${spendCards.join('')}${c4}${c5}</div>`;
+}
+
+/* ---------- readings ---------- */
+function openReadingForm(v, r) {
+  const isNew = !r;
+  r = r || { date: new Date().toISOString().slice(0, 10), unit: v.odometer_unit || 'mi' };
+  const dist = v.meter !== 'hours', hrs = v.meter !== 'distance';
+  openPanel(isNew ? 'Log reading' : 'Edit reading', `
+    <p class="hint" style="margin:0 0 18px">${esc(vname(v))}${v.odometer != null || v.hours != null ? ` · last recorded ${readingStr(v.odometer, v.odometer_unit, v.hours)}${v.odometer_date ? ' on ' + fdate(v.odometer_date) : ''}` : ''}</p>
+    <form id="rd-form" novalidate>
+      ${field('date', 'Date of reading', 'date', r.date, { required: true })}
+      ${dist ? `<div class="two">${field('odometer', 'Odometer', 'text', r.odometer != null ? num(r.odometer) : '', { inputmode: 'numeric', required: !hrs })}${field('unit', 'Unit', 'select', r.unit, { required: true, options: [['mi', 'Miles'], ['km', 'Kilometres']] })}</div>` : ''}
+      ${hrs ? field('hours', 'Engine hours', 'text', r.hours ?? '', { inputmode: 'decimal', required: !dist }) : ''}
+      ${field('notes', 'Note', 'text', r.notes, { ph: 'Before track day, after trip…' })}
+      ${!isNew ? `<fieldset style="margin-top:8px"><legend>Delete</legend><div id="del-box"><button class="btn danger" type="button" id="del-rd">Delete this reading…</button></div></fieldset>` : ''}
+    </form>`,
+    `<button class="btn" type="button" id="cancel">Cancel</button><button class="btn primary" type="button" data-submit>${isNew ? 'Save reading' : 'Save changes'}</button>`);
+  $('#cancel').onclick = closePanel;
+  if (!isNew) $('#del-rd').onclick = () => {
+    $('#del-box').innerHTML = `<div class="confirm"><p>Delete the reading of <b>${esc(readingStr(r.odometer, r.unit, r.hours))}</b>${r.date ? ' from ' + fdate(r.date) : ''}? This can't be undone.</p>
+      <button class="btn" type="button" id="del-no">Keep it</button> <button class="btn danger solid" type="button" id="del-yes">Delete reading</button></div>`;
+    $('#del-no').onclick = () => openReadingForm(v, r);
+    $('#del-yes').onclick = async () => {
+      const { error } = await db.from('odometer_readings').delete().eq('id', r.id);
+      if (error) return toast('Couldn\'t delete: ' + error.message, true);
+      S.readings = S.readings.filter(x => x.id !== r.id); closePanel(); toast('Reading deleted'); render();
+    };
+  };
+  const rules = {
+    date: x => !x ? 'Enter the date of the reading.' : x > new Date().toISOString().slice(0, 10) ? 'The date can\'t be in the future.' : '',
+  };
+  if (dist) rules.odometer = (x, f) => x && !/^[\d,]+$/.test(x.trim()) ? 'Odometer should be a whole number, like 62,950.' : (!x && (!hrs || !f.elements.hours.value)) ? 'Enter the odometer reading.' : '';
+  if (hrs) rules.hours = (x, f) => x && !/^[\d,]*\.?\d?$/.test(x.trim()) ? 'Engine hours should be a number, like 123.5.' : (!x && (!dist || !f.elements.odometer.value)) ? 'Enter the engine hours.' : '';
+  wireForm('#rd-form', rules, async f => {
+    const row = { vehicle_id: v.id, date: f.date, odometer: dist ? nInt(f.odometer) : null, unit: dist ? f.unit : (v.odometer_unit || 'mi'), hours: hrs ? nMoney(f.hours) : null, notes: nz((f.notes || '').trim()) };
+    const res = isNew ? await db.from('odometer_readings').insert(row).select().single() : await db.from('odometer_readings').update(row).eq('id', r.id).select().single();
+    if (res.error) throw new Error('Couldn\'t save: ' + res.error.message);
+    S.readings = (isNew ? [res.data, ...S.readings] : S.readings.map(x => x.id === r.id ? res.data : x)).sort((a, b) => (!a.date) - (!b.date) || (b.date || '').localeCompare(a.date || ''));
+    // keep the vehicle's current reading in step when this is the newest one
+    if (!v.odometer_date || row.date >= v.odometer_date) {
+      const upd = { odometer_date: row.date };
+      if (row.odometer != null) { upd.odometer = row.unit === v.odometer_unit ? row.odometer : Math.round(conv(row.odometer, row.unit, v.odometer_unit)); }
+      if (row.hours != null) upd.hours = row.hours;
+      const u = await db.from('vehicles').update(upd).eq('id', v.id).select().single();
+      if (!u.error) S.vehicles = S.vehicles.map(x => x.id === v.id ? u.data : x);
+    }
+    closePanel(); toast(isNew ? 'Reading saved' : 'Saved'); render();
+  });
+}
+
 /* ---------- router ---------- */
-function current() { const h = location.hash.replace(/^#\/?/, '') || 'cars'; const [a, b] = h.split('/'); return { a, b }; }
+function current() { const h = location.hash.replace(/^#\/?/, '') || 'dashboard'; const [a, b] = h.split('/'); return { a, b }; }
 function render() {
   const { a, b } = current();
   const tab = a === 'vehicle' ? (vById(b)?.kind === 'bike' ? 'bikes' : 'cars') : a;
@@ -807,13 +1088,14 @@ function render() {
   $('#n-bikes').textContent = S.vehicles.filter(v => v.kind === 'bike').length || '';
   const banner = window.live.state === 'offline' ? `<div class="banner">Couldn't reach the database, so this is the saved copy. Changes are paused until the connection is back.</div>` : '';
   let html;
-  if (a === 'bikes') html = viewList('bike');
+  if (a === 'dashboard') html = viewDashboard();
+  else if (a === 'bikes') html = viewList('bike');
   else if (a === 'ledger') html = viewLedger();
   else if (a === 'costs') html = viewCosts();
   else if (a === 'vehicle') html = viewVehicle(b);
   else html = viewList('car');
-  const titles = { cars: 'Cars', bikes: 'Bikes', ledger: 'Service ledger', costs: 'Costs' };
-  document.title = (a === 'vehicle' ? vname(vById(b)) : titles[a] || 'Cars') + ' · Home Collection';
+  const titles = { dashboard: 'Dashboard', cars: 'Cars', bikes: 'Bikes', ledger: 'Service ledger', costs: 'Costs' };
+  document.title = (a === 'vehicle' ? vname(vById(b)) : titles[a] || 'Dashboard') + ' · Home Collection';
   $('#view').innerHTML = banner + html;
   wireView();
 }
@@ -825,6 +1107,12 @@ function wireView() {
   V.querySelectorAll('[data-rec]').forEach(b => b.onclick = () => openRecord(S.records.find(r => r.id === b.dataset.rec)));
   V.querySelectorAll('[data-signin]').forEach(b => b.onclick = openAccount);
   V.querySelectorAll('[data-more-reads]').forEach(b => b.onclick = () => { readLimit[b.dataset.moreReads] = 1e9; render(); });
+  V.querySelectorAll('[data-garage]').forEach(b => b.onclick = () => { GF.k = b.dataset.garage; render(); });
+  V.querySelectorAll('[data-unit]').forEach(b => b.onclick = () => { distUnit = b.dataset.unit; try { localStorage.setItem('hc-unit', distUnit); } catch (e) {} render(); });
+  V.querySelectorAll('[data-table]').forEach(b => b.onclick = () => { const c = b.closest('.cc'); const on = c.classList.toggle('as-table'); b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chart' : 'Table'; });
+  V.querySelectorAll('[data-log]').forEach(b => b.onclick = () => openReadingForm(vById(b.dataset.log)));
+  V.querySelectorAll('[data-read]').forEach(b => b.onclick = () => { const r = S.readings.find(x => x.id === b.dataset.read); openReadingForm(vById(r.vehicle_id), r); });
+  V.querySelectorAll('.lc').forEach(wireLine);
   const keep = (id, k) => { const el = $(id); if (!el) return; el.oninput = el.onchange = () => { LF[k] = el.value; const pos = el.selectionStart; render(); const n = $(id); n.focus(); if (pos != null && n.setSelectionRange) n.setSelectionRange(pos, pos); }; };
   keep('#lf-q', 'q'); keep('#lf-v', 'v'); keep('#lf-c', 'c'); keep('#lf-y', 'y');
   const c = $('#lf-clear'); if (c) c.onclick = () => { Object.keys(LF).forEach(k => LF[k] = ''); render(); };
