@@ -482,7 +482,7 @@ async function load() {
     await signMedia();
     try { localStorage.setItem('hc-cache', JSON.stringify({ saved: new Date().toISOString().slice(0, 10), vehicles: v.data, records: r.data, readings: o.data, comps: mc.data || [], tasks: tk.data || [] })); } catch (e) {}
     setLive('live');
-    setTimeout(() => refreshFipe().then(autoWebmotors), 50);
+    setTimeout(() => refreshFipe().then(autoBat), 50);
   } catch (e) { console.warn('Database unreachable, showing saved copy', e); await useSnapshot(/timed out/.test(e.message || '') ? 'the database didn\'t answer' : 'the database couldn\'t be reached'); return; }
   render();
 }
@@ -1254,7 +1254,7 @@ function divBars(items) {
 let PCUR = (() => { try { return localStorage.getItem('hc-pcur') || 'BRL'; } catch (e) { return 'BRL'; } })();
 function viewPortfolio() {
   const head = (extra = '') => `<div class="head"><div><p class="eyebrow">The collection as an investment</p><h1>Portfolio</h1>${extra}</div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${S.editor ? `<button class="btn sm" type="button" data-wm-all>Refresh Webmotors prices</button>` : ''}<div class="seg sm" role="group" aria-label="Show totals in">${['BRL', 'USD'].map(c => `<button type="button" data-pcur="${c}" aria-pressed="${PCUR === c}">${SYM[c]}</button>`).join('')}</div></div></div>`;
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${S.editor ? `<button class="btn sm" type="button" data-bat-all>Refresh BaT prices</button>` : ''}<div class="seg sm" role="group" aria-label="Show totals in">${['BRL', 'USD'].map(c => `<button type="button" data-pcur="${c}" aria-pressed="${PCUR === c}">${SYM[c]}</button>`).join('')}</div></div></div>`;
   if (window.live.state === 'loading') return head() + '<div class="skel" style="height:240px"></div>';
   if (!S.vehicles.length) return head() + `<div class="empty"><h2>Nothing to value yet</h2><p>Add vehicles with their purchase price, then market values to track returns.</p></div>`;
   const P = S.vehicles.filter(v => v.status !== 'sold').map(perf);
@@ -1271,7 +1271,7 @@ function viewPortfolio() {
   </dl>`;
   const sorted = valued.slice().sort((a, b) => b.pct - a.pct);
   if (!valued.length) return head(`<p class="sub">${esc(fxNote)}</p>`) + `<div class="empty" style="text-align:left;max-width:640px"><h2>Start valuing the collection</h2><p>Each vehicle needs a market value to compare with what you paid. Open a vehicle and, under Market value:</p>
-    <ol class="hint" style="margin:0 0 20px;padding-left:20px;line-height:1.8"><li><b style="color:var(--fg)">Search Webmotors</b>: pulls current asking prices for the same model; the median becomes the market value (Brazilian vehicles).</li><li><b style="color:var(--fg)">Add comparable</b>: paste a Bring a Trailer result or any listing by hand.</li><li><b style="color:var(--fg)">Link FIPE model</b>: the FIPE reference price, used only when there are no listings.</li><li><b style="color:var(--fg)">My estimate</b>: your own figure, for one-offs with no good comparables.</li></ol>
+    <ol class="hint" style="margin:0 0 20px;padding-left:20px;line-height:1.8"><li><b style="color:var(--fg)">Search BaT</b>: pulls completed Bring a Trailer auctions for the same model; the median sold price becomes the market value.</li><li><b style="color:var(--fg)">Add comparable</b>: paste a Bring a Trailer result or any listing by hand.</li><li><b style="color:var(--fg)">Link FIPE model</b>: the FIPE reference price, used only when there are no listings.</li><li><b style="color:var(--fg)">My estimate</b>: your own figure, for one-offs with no good comparables.</li></ol>
     <a class="btn primary" href="#/cars">Go to cars</a></div>` + `<div class="section"><h2 style="font-size:22px;margin-bottom:6px">Costs</h2><p class="hint" style="margin:0 0 20px">Reais and dollars are shown separately, never converted.</p>${costsBody()}</div>`;
   const chart = valued.length ? chartCard('Return on purchase price', 'Blue is a gain, red a loss · market value vs. price paid',
     divBars(sorted.map(p => ({ label: vshort(p.v) + (p.v.colour && S.vehicles.filter(x => x.make === p.v.make && x.model === p.v.model).length > 1 ? ' ' + p.v.colour : ''), value: p.pct, href: '#/vehicle/' + p.v.id, tip: `${vname(p.v)}\nPaid ${money(p.pp, 0, p.cur)} · worth ${money(p.val.value, 0, p.cur)}\n${signMoney(p.gain, p.cur)} (${pctStr(p.pct)}) · ${p.val.label}` }))),
@@ -1302,7 +1302,7 @@ function marketSection(v) {
   const fipe = v.fipe_model
     ? `<div class="li" style="border-top:1px solid var(--line)"><span style="min-width:0"><span class="t" style="display:block">FIPE · ${esc(v.fipe_label || '')}</span><span class="m" style="display:block">${esc([v.fipe_code, v.fipe_ref].filter(Boolean).join(' · '))}${v.fipe_checked ? ' · checked ' + fdate(v.fipe_checked) : ''}</span></span><span class="r">${v.fipe_value != null ? money(v.fipe_value, 0, 'BRL') : '—'} ${S.editor ? `<button class="btn sm" type="button" data-fipe="${v.id}" style="margin-left:8px">Change</button>` : ''}</span></div>`
     : (S.editor ? `<p class="hint" style="margin:0 0 6px">Link this ${v.kind === 'bike' ? 'bike' : 'car'} to the FIPE table for an automatic monthly reference price (Brazilian market; rare classics may not be listed). <button class="btn sm" type="button" data-fipe="${v.id}" style="margin-left:6px">Link FIPE model</button></p>` : '');
-  const autoC = comps.filter(c => c.auto), manC = comps.filter(c => !c.auto);
+  const autoC = comps.filter(c => c.auto && c.source === 'webmotors'), manC = comps.filter(c => !c.auto);
   const wmPrices = autoC.filter(c => c.include).map(c => +c.price);
   const wm = `<div class="wm"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
       <div style="min-width:0"><h3 style="font-size:14px;margin:0 0 4px">Webmotors listings</h3>
@@ -1312,10 +1312,11 @@ function marketSection(v) {
     </div>
     ${autoC.length ? `<details style="margin-top:10px"><summary class="hint" style="cursor:pointer">Show the ${autoC.length} listing${autoC.length === 1 ? '' : 's'} (untick bad matches)</summary><div class="rows" style="margin-top:8px">${autoC.map(c => `<div class="row" style="cursor:default;${c.include ? '' : 'opacity:.5'}"><span class="d">${c.mileage != null ? num(c.mileage) + ' km' : '—'}</span><span class="tm"><span class="t" style="display:block">${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.title || 'Listing')}</a>` : esc(c.title || 'Listing')}</span><span class="m" style="display:block">${esc(c.notes || '')}${c.include ? '' : ' · excluded'}</span></span><span class="mi">${S.editor ? `<label class="check" style="margin:0;justify-content:flex-end"><input type="checkbox" data-wm-inc="${c.id}" ${c.include ? 'checked' : ''}> Use</label>` : ''}</span><span class="a">${money(c.price, 0, 'BRL')}</span></div>`).join('')}</div></details>` : ''}
   </div>`;
+  void wm; // Webmotors box hidden for now
   const list = manC.length ? `<div class="rows">${manC.map(c => `<button class="row" type="button" data-comp="${c.id}" style="${c.include ? '' : 'opacity:.5'}"><span class="d">${fdate(c.date)}</span><span class="tm"><span class="t" style="display:block">${esc(c.title || SRC[c.source])}</span><span class="m" style="display:block">${esc(SRC[c.source])} · ${c.kind === 'sold' ? 'Sold' : 'Asking'}${c.mileage != null ? ' · ' + num(c.mileage) + ' ' + c.mileage_unit : ''}${c.include ? '' : ' · excluded'}</span></span><span class="mi">${c.currency !== cur && S.fx ? '≈ ' + money(toCur(+c.price, c.currency, cur), 0, cur) : ''}</span><span class="a">${money(c.price, 0, c.currency)}</span></button>`).join('')}</div>`
     : `<p class="none">None added by hand. Use Add comparable for Bring a Trailer results or specific listings.</p>`;
   return `<div class="section"><div class="section-head"><h2>Market value</h2>${S.editor ? `<button class="btn sm" type="button" data-add-comp="${v.id}">${ICON.plus}Add comparable</button>` : ''}</div>
-    ${tiles}${mode}${wm}<h3 style="font-size:14px;margin:22px 0 10px">Comparable sales added by hand</h3>${list}${fipe ? `<div style="margin-top:22px">${fipe}</div>` : ''}</div>`;
+    ${tiles}${mode}${batBox(v, comps)}<h3 style="font-size:14px;margin:22px 0 10px">Comparable sales added by hand</h3>${list}${fipe ? `<div style="margin-top:22px">${fipe}</div>` : ''}</div>`;
 }
 function openCompForm(v, c) {
   const isNew = !c;
@@ -1628,6 +1629,81 @@ function openCompleteForm(v) {
   });
 }
 
+
+/* ---------- Bring a Trailer sold results ---------- */
+const batDefaults = v => ({ query: [v.make, v.model].filter(Boolean).join(' '), from: v.year ? v.year - 2 : '', to: v.year ? v.year + 2 : '' });
+function batBox(v, comps) {
+  const auto = comps.filter(c => c.auto && c.source === 'bat');
+  const used = auto.filter(c => c.include).map(c => +c.price);
+  const yrs = v.bat_year_from || v.bat_year_to ? ` · ${v.bat_year_from ?? ''}–${v.bat_year_to ?? ''}` : '';
+  const what = v.bat_url ? 'your BaT link' : `"${esc(v.bat_query || batDefaults(v).query)}"`;
+  return `<div class="wm"><div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+      <div style="min-width:0"><h3 style="font-size:14px;margin:0 0 4px">Bring a Trailer sold prices</h3>
+        <p class="hint" style="margin:0">${v.bat_checked ? `Searched ${what}${v.bat_must ? ` · must include "${esc(v.bat_must)}"` : ''}${yrs} on ${fdate(v.bat_checked)} · ${esc(v.bat_status || '')}` : (v.bat_status ? esc(v.bat_status) : 'Pull completed BaT auctions for this model. Only cars and bikes that actually sold are used.')}</p>
+        ${used.length ? `<p style="margin:8px 0 0;font-size:14px">Median <b class="mono">${money(median(used), 0, 'USD')}</b> <span class="hint">· range ${money(Math.min(...used), 0, 'USD')}–${money(Math.max(...used), 0, 'USD')} · ${used.length} sale${used.length === 1 ? '' : 's'} used${v.currency === 'BRL' && S.fx ? ` · ≈ ${money(toCur(median(used), 'USD', 'BRL'), 0, 'BRL')}` : ''}</span></p>` : ''}</div>
+      ${S.editor ? `<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn sm" type="button" data-bat-set="${v.id}">Search settings</button><button class="btn sm primary" type="button" data-bat-run="${v.id}">${v.bat_checked ? 'Refresh' : 'Search BaT'}</button></div>` : ''}
+    </div>
+    ${auto.length ? `<details style="margin-top:10px"><summary class="hint" style="cursor:pointer">Show the ${auto.length} sale${auto.length === 1 ? '' : 's'} (untick bad matches)</summary><div class="rows" style="margin-top:8px">${auto.map(c => `<div class="row" style="cursor:default;${c.include ? '' : 'opacity:.5'}"><span class="d">${fdate(c.date)}</span><span class="tm"><span class="t" style="display:block">${c.url ? `<a href="${esc(c.url)}" target="_blank" rel="noopener">${esc(c.title || 'Sale')}</a>` : esc(c.title || 'Sale')}</span><span class="m" style="display:block">${c.mileage != null ? num(c.mileage) + ' mi · ' : ''}${esc(c.notes || '')}${c.include ? '' : ' · excluded'}</span></span><span class="mi">${S.editor ? `<label class="check" style="margin:0;justify-content:flex-end"><input type="checkbox" data-wm-inc="${c.id}" ${c.include ? 'checked' : ''}> Use</label>` : ''}</span><span class="a">${money(c.price, 0, c.currency)}</span></div>`).join('')}</div></details>` : ''}
+  </div>`;
+}
+async function runBat(v, quiet) {
+  const { data, error } = await db.functions.invoke('bat', { body: { vehicle_id: v.id } });
+  let res = data;
+  if (error) { try { res = await error.context.json(); } catch (e) { res = { message: error.message }; } }
+  const [mc, vv] = await Promise.all([db.from('market_comps').select('*').eq('vehicle_id', v.id), db.from('vehicles').select('*').eq('id', v.id).single()]);
+  if (!mc.error) S.comps = [...S.comps.filter(c => c.vehicle_id !== v.id), ...(mc.data || [])];
+  if (!vv.error) S.vehicles = S.vehicles.map(x => x.id === v.id ? { ...x, ...vv.data } : x);
+  if (res && res.ok) { if (!quiet) toast(`${vshort(v)}: ${res.status}`); }
+  else if (!quiet) toast(res?.message || 'Bring a Trailer search failed. Try again.', true);
+  render();
+  return res;
+}
+function openBatForm(v) {
+  const d = batDefaults(v), fresh = !v.bat_checked && !v.bat_query && !v.bat_url;
+  openPanel('Bring a Trailer search', `
+    <p class="hint" style="margin:0 0 18px">${esc(vname(v))}. Searches completed BaT auctions and keeps the ones that sold. About US$0.15 per search on Apify.</p>
+    <form id="bs-form" novalidate>
+      ${field('bat_query', 'Search words', 'text', v.bat_query || d.query, { help: 'Like BaT\'s search box: "Honda CBX", "Porsche 911 Turbo S", "Kawasaki ZX-10".' })}
+      ${field('bat_url', 'Or a BaT model page link', 'url', v.bat_url, { ph: 'https://bringatrailer.com/bmw/e30-m3/', help: 'Optional. Use the make/model pages on BaT; when set, the search words are ignored.' })}
+      ${field('bat_must', 'Title must include', 'text', v.bat_must, { ph: 'Turbo S, Competition, 1000…', help: 'Optional words every auction title must contain.' })}
+      <div class="two">${field('bat_year_from', 'Model year from', 'text', v.bat_year_from ?? (fresh ? d.from : ''), { inputmode: 'numeric' })}${field('bat_year_to', 'to', 'text', v.bat_year_to ?? (fresh ? d.to : ''), { inputmode: 'numeric' })}</div>
+    </form>`,
+    `<button class="btn" type="button" id="cancel">Cancel</button><button class="btn" type="button" id="bs-save">Save</button><button class="btn primary" type="button" data-submit>Save and search</button>`);
+  $('#cancel').onclick = closePanel;
+  let after = true; $('#bs-save').onclick = () => { after = false; $('#bs-form').requestSubmit(); };
+  const yr = x => x && !/^\d{4}$/.test(String(x).trim()) ? 'Enter a 4-digit year, or leave it empty.' : '';
+  wireForm('#bs-form', {
+    bat_url: x => x && !/^https:\/\/(www\.)?bringatrailer\.com\//i.test(x.trim()) ? 'Paste a link that starts with https://bringatrailer.com/' : '',
+    bat_query: (x, f) => !x.trim() && !f.elements.bat_url.value.trim() ? 'Enter search words or paste a BaT link.' : '',
+    bat_year_from: yr, bat_year_to: yr
+  }, async f => {
+    const upd = { bat_query: nz(f.bat_query.trim()), bat_url: nz(f.bat_url.trim()), bat_must: nz(f.bat_must.trim()), bat_year_from: f.bat_year_from ? +f.bat_year_from : null, bat_year_to: f.bat_year_to ? +f.bat_year_to : null };
+    if (upd.bat_year_from && upd.bat_year_to && upd.bat_year_from > upd.bat_year_to) throw new Error('"From" year is after the "to" year.');
+    const u = await db.from('vehicles').update(upd).eq('id', v.id).select().single();
+    if (u.error) throw new Error('Couldn\'t save: ' + u.error.message);
+    S.vehicles = S.vehicles.map(x => x.id === v.id ? { ...x, ...u.data } : x);
+    closePanel();
+    if (after) { toast('Searching Bring a Trailer… this can take up to a minute'); await runBat(vById(v.id)); } else { toast('Saved'); render(); }
+  });
+}
+let batBusy = false;
+async function refreshAllBat(list, label) {
+  if (batBusy) return; batBusy = true; let ok = 0, fail = 0, first = null;
+  for (let i = 0; i < list.length; i++) {
+    toast(`${label} ${i + 1} of ${list.length}: ${vshort(list[i])}…`);
+    const r = await runBat(list[i], true);
+    if (r && r.ok) ok++; else { fail++; first = first || r?.message; if (r?.error === 'missing_token') break; }
+  }
+  batBusy = false;
+  toast(fail ? `BaT: ${ok} updated, ${fail} failed${first ? ' — ' + first : ''}` : `BaT: ${ok} vehicle${ok === 1 ? '' : 's'} updated`, !!fail);
+}
+async function autoBat() { // monthly refresh for vehicles already searched once
+  if (!S.editor || !db) return;
+  const cutoff = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  const due = S.vehicles.filter(v => v.status !== 'sold' && v.bat_checked && v.bat_checked < cutoff).slice(0, 8);
+  if (due.length) await refreshAllBat(due, 'Monthly BaT refresh');
+}
+
 /* ---------- router ---------- */
 function current() { const h = location.hash.replace(/^#\/?/, '') || 'dashboard'; const [a, b] = h.split('/'); return { a, b }; }
 function render() {
@@ -1666,7 +1742,14 @@ function wireView() {
   V.querySelectorAll('.lc').forEach(wireLine);
   V.querySelectorAll('[data-wm-run]').forEach(b => b.onclick = async () => { b.disabled = true; b.textContent = 'Searching…'; toast('Searching Webmotors… this can take up to a minute'); await runWebmotors(vById(b.dataset.wmRun)); });
   V.querySelectorAll('[data-wm-set]').forEach(b => b.onclick = () => openMarketForm(vById(b.dataset.wmSet)));
-  V.querySelectorAll('[data-wm-inc]').forEach(b => b.onchange = async () => { const u = await db.from('market_comps').update({ include: b.checked }).eq('id', b.dataset.wmInc).select().single(); if (u.error) { b.checked = !b.checked; return toast('Couldn\'t save: ' + u.error.message, true); } S.comps = S.comps.map(c => c.id === u.data.id ? u.data : c); const d = b.closest('details'); render(); const nd = document.querySelector('.wm details'); if (d && nd) nd.open = true; });
+  V.querySelectorAll('[data-wm-inc]').forEach(b => b.onchange = async () => { const u = await db.from('market_comps').update({ include: b.checked }).eq('id', b.dataset.wmInc).select().single(); if (u.error) { b.checked = !b.checked; return toast('Couldn\'t save: ' + u.error.message, true); } S.comps = S.comps.map(c => c.id === u.data.id ? u.data : c); const boxes = [...document.querySelectorAll('.wm')], idx = boxes.indexOf(b.closest('.wm')); render(); const nb = document.querySelectorAll('.wm')[idx]; const nd = nb && nb.querySelector('details'); if (nd) nd.open = true; });
+  V.querySelectorAll('[data-bat-run]').forEach(b => b.onclick = async () => { b.disabled = true; b.textContent = 'Searching…'; toast('Searching Bring a Trailer… this can take up to a minute'); await runBat(vById(b.dataset.batRun)); });
+  V.querySelectorAll('[data-bat-set]').forEach(b => b.onclick = () => openBatForm(vById(b.dataset.batSet)));
+  V.querySelectorAll('[data-bat-all]').forEach(b => b.onclick = () => {
+    const list = S.vehicles.filter(v => v.status !== 'sold' && (v.bat_checked || v.bat_query || v.bat_url || v.kind === 'bike' || v.currency === 'USD'));
+    if (!list.length) return toast('No bikes or US cars to search.', true);
+    refreshAllBat(list, 'BaT');
+  });
   V.querySelectorAll('[data-wm-all]').forEach(b => b.onclick = () => { const list = S.vehicles.filter(v => v.status !== 'sold' && (v.market_checked || (v.currency === 'BRL' && v.purchase_price != null))); if (!list.length) return toast('No Brazilian vehicles to search.', true); refreshAllWebmotors(list, 'Webmotors'); });
   V.querySelectorAll('[data-tf]').forEach(b => b.onclick = () => { TF.k = b.dataset.tf; render(); });
   V.querySelectorAll('[data-task]').forEach(b => b.onclick = () => { const v = b.dataset.task ? vById(b.dataset.task) : null; openTaskForm(v, v ? openTask(v) : null); });
