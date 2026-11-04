@@ -334,7 +334,10 @@ legend{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--f
 
 <script>
 /* ---------- config ---------- */
-const SUPA_URL = 'https://ftettbbdgivkbamonywf.supabase.co';
+// The database is reached through this site's own address (/sb, a Vercel rewrite), so networks or
+// browser extensions that block supabase.co don't stop the page. Local previews talk to it directly.
+const SUPA_DIRECT = 'https://ftettbbdgivkbamonywf.supabase.co';
+const SUPA_URL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) || location.protocol === 'file:' ? SUPA_DIRECT : location.origin + '/sb';
 const SUPA_KEY = 'sb_publishable_9jiNbL4oGDjaXOEstTlmzQ_ulmZMw2J';
 
 const CATEGORIES = {
