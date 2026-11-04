@@ -392,14 +392,28 @@ function toast(msg, bad) {
 }
 
 /* ---------- data ---------- */
+// Signed-out visitors may only read these columns (enforced by the database's column grants).
+const PUBLIC_COLS = {
+  vehicles: 'id,kind,year,make,model,trim_level,nickname,colour,vin,engine,transmission,drivetrain,power,odometer,odometer_unit,odometer_date,hours,meter,purchase_date,purchased_from,status,sold_date,co_owners,plate,location,photo_url,sort_order,currency,created_at,updated_at',
+  service_records: 'id,vehicle_id,date,mileage,mileage_approx,hours,shop,title,items,category,confidence,currency,created_at,updated_at',
+  odometer_readings: 'id,vehicle_id,date,odometer,unit,hours,notes,created_at,updated_at'
+};
+const PRIVATE = { vehicles: ['purchase_price', 'estimated_value', 'value_date', 'sold_price', 'notes', 'updated_by'], records: ['amount', 'notes', 'invoice_url', 'updated_by'], readings: ['updated_by'] };
+function stripPrivate() {
+  const drop = (rows, keys) => rows.forEach(r => keys.forEach(k => { delete r[k]; }));
+  drop(S.vehicles, PRIVATE.vehicles); drop(S.records, PRIVATE.records); drop(S.readings, PRIVATE.readings);
+}
 async function load() {
   if (!db) { await useSnapshot('the database library didn\'t load'); return; }
   try {
+    const full = !!(await db.auth.getSession()).data.session;
+    const cols = t => full ? '*' : PUBLIC_COLS[t];
+    S.loadedFull = full;
     const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), 10000));
     const [v, r, o] = await Promise.race([timeout, Promise.all([
-      db.from('vehicles').select('*').order('sort_order').order('year', { ascending: false }),
-      db.from('service_records').select('*').order('date', { ascending: false, nullsFirst: false }),
-      db.from('odometer_readings').select('*').order('date', { ascending: false, nullsFirst: false })
+      db.from('vehicles').select(cols('vehicles')).order('sort_order').order('year', { ascending: false }),
+      db.from('service_records').select(cols('service_records')).order('date', { ascending: false, nullsFirst: false }),
+      db.from('odometer_readings').select(cols('odometer_readings')).order('date', { ascending: false, nullsFirst: false })
     ])]);
     const err = v.error || r.error || o.error;
     if (err && !load.retried && /jwt|token|401|PGRST30/i.test((err.code || '') + ' ' + (err.message || ''))) {
@@ -408,6 +422,7 @@ async function load() {
     }
     if (err) throw err;
     S.vehicles = v.data; S.records = sortRecs(r.data); S.readings = o.data; S.offline = null;
+    if (!full) stripPrivate();
     try { localStorage.setItem('hc-cache', JSON.stringify({ saved: new Date().toISOString().slice(0, 10), vehicles: v.data, records: r.data, readings: o.data })); } catch (e) {}
     setLive('live');
   } catch (e) { console.warn('Database unreachable, showing saved copy', e); await useSnapshot(/timed out/.test(e.message || '') ? 'the database didn\'t answer' : 'the database couldn\'t be reached'); return; }
@@ -420,6 +435,7 @@ async function useSnapshot(reason) {
   snap = snap || { vehicles: [], records: [], readings: [] };
   S.vehicles = snap.vehicles || []; S.records = sortRecs(snap.records || []); S.readings = snap.readings || [];
   S.offline = { reason, saved: snap.saved };
+  if (!S.user) stripPrivate();
   setLive('offline'); render();
 }
 function setLive(s) {
@@ -440,6 +456,7 @@ async function refreshAuth(session) {
     S.editor = !!(ed && ed.length);
   }
   $('#acct-btn').textContent = S.user ? (S.editor ? 'Editing' : 'Signed in') : 'Sign in';
+  if (window.live.state !== 'loading' && S.loadedFull !== undefined && S.loadedFull !== !!S.user) { load(); return; } // fetch (or drop) the private fields
   render();
 }
 function authMsg(err) {
@@ -471,7 +488,7 @@ function openAccount() {
       if (error) throw new Error(authMsg(error));
       toast('Password saved'); closePanel();
     });
-    $('#so').onclick = async () => { await db.auth.signOut(); closePanel(); toast('Signed out'); refreshAuth(); };
+    $('#so').onclick = async () => { await db.auth.signOut(); try { localStorage.removeItem('hc-cache'); } catch (e) {} closePanel(); toast('Signed out'); };
     return;
   }
   let mode = 'in';
@@ -656,10 +673,10 @@ function viewVehicle(id) {
         <dl class="stats">
           <div><dt>${v.meter === 'hours' ? 'Hours' : 'Odometer'}</dt><dd>${v.meter === 'hours' ? (v.hours != null ? (+v.hours).toLocaleString('en-US') + ' <small>h</small>' : '—') : v.odometer != null ? num(v.odometer) + ` <small>${v.odometer_unit}</small>` + (v.meter === 'both' && v.hours != null ? ` <small>· ${(+v.hours).toLocaleString('en-US')} h</small>` : '') : '—'}</dd></div>
           <div><dt>${v.meter === 'hours' ? 'Hours' : 'Driven'} in ${YEAR}</dt><dd>${v.meter === 'hours' ? yHours(v) : (d => d ? Math.round(d).toLocaleString('en-US') + ` <small>${v.odometer_unit}</small>` : '—')(drivenIn(v, YEAR, v.odometer_unit))}</dd></div>
-          <div><dt>Paid</dt><dd>${money(v.purchase_price, 0, v.currency)}</dd></div>
+          ${S.user ? `<div><dt>Paid</dt><dd>${money(v.purchase_price, 0, v.currency)}</dd></div>
           <div><dt>Estimated value</dt><dd>${v.estimated_value != null ? money(v.estimated_value, 0, v.currency) : (S.editor ? `<button class="btn sm" type="button" data-edit-v="${v.id}">Add estimate</button>` : '—')}</dd></div>
           <div><dt>Service & parts</dt><dd>${msum(sp)}</dd></div>
-          <div><dt>Total in</dt><dd>${msum(addSums(paid(v), sp))}</dd></div>
+          <div><dt>Total in</dt><dd>${msum(addSums(paid(v), sp))}</dd></div>` : ''}
           <div><dt>Owned</dt><dd>${owned != null ? (owned >= 365 ? (owned / 365).toFixed(1) + ' <small>yrs</small>' : owned + ' <small>days</small>') : '—'}</dd></div>
           <div><dt>Records</dt><dd>${recs.length}</dd></div>
         </dl>
@@ -671,7 +688,7 @@ function viewVehicle(id) {
     <div class="section"><h2>Ownership</h2>${dl(own)}</div>
     ${v.notes ? `<div class="section"><h2>Notes</h2><p class="notes">${esc(v.notes)}</p></div>` : ''}
     <div class="section">
-      <div class="section-head"><h2>Service history</h2>${recs.length ? `<span class="hint">${recs.length} record${recs.length === 1 ? '' : 's'} · ${msum(sp, 1)}</span>` : ''}</div>
+      <div class="section-head"><h2>Service history</h2>${recs.length ? `<span class="hint">${recs.length} record${recs.length === 1 ? '' : 's'}${S.user ? ' · ' + msum(sp, 1) : ''}</span>` : ''}</div>
       ${recs.length ? rowsHtml(recs, false) : `<div class="empty"><h2>No service records yet</h2><p>Add work as it happens, or send invoices and they'll be entered here.</p>${S.editor ? `<button class="btn primary" type="button" data-add-r="${v.id}">${ICON.plus}Add service</button>` : ''}</div>`}
     </div>
     ${reads.length || S.editor ? `<div class="section">
@@ -699,7 +716,7 @@ function vehicleCharts(v) {
   const other = recs.some(r => r.currency !== cur && +r.amount);
   const c2 = chartCard(`Service spend by year (${SYM[cur]})`, other ? `Only ${SYM[cur]} amounts; see the history for others` : `${years[0]}–${YEAR}`,
     anySpend ? vbars(items, n => SYM[cur] + short(n)) : '<p class="none">No service costs recorded yet.</p>', anySpend ? [['Year', `Spend (${SYM[cur]})`, 'Records'], ...items.map(i => [String(i.year), money(i.value, 0, cur), String(i.n)])] : null);
-  return `<div class="charts vcharts">${c1}${c2}</div>`;
+  return S.user ? `<div class="charts vcharts">${c1}${c2}</div>` : `<div class="charts vcharts" style="grid-template-columns:1fr">${c1}</div>`;
 }
 function rowsHtml(recs, showVehicle) {
   return `<div class="rows">${recs.map(r => {
@@ -709,7 +726,7 @@ function rowsHtml(recs, showVehicle) {
       <span class="d">${r.date ? fdate(r.date) : 'Undated'}</span>
       <span class="tm"><span class="t" style="display:block">${esc(r.title)}${r.invoice_url ? ' <span class="hint" title="Invoice attached">· invoice</span>' : ''}</span><span class="m" style="display:block">${esc(meta)}</span></span>
       <span class="mi">${r.mileage != null ? (r.mileage_approx ? '≈' : '') + num(r.mileage) + ' ' + (v?.odometer_unit || '') : r.hours != null ? (+r.hours).toLocaleString('en-US') + ' h' : ''}</span>
-      <span class="a">${r.amount != null ? money(r.amount, 1, r.currency) : '—'}${r.confidence === 'est' ? '*' : ''}</span>
+      <span class="a">${r.amount != null ? money(r.amount, 1, r.currency) : (S.user ? '—' : '')}${r.confidence === 'est' && S.user ? '*' : ''}</span>
     </button>`; }).join('')}</div>`;
 }
 const LF = { v: '', c: '', y: '', q: '' };
@@ -729,12 +746,13 @@ function viewLedger() {
       <div class="fld"><label for="lf-c">Category</label><select id="lf-c"><option value="">All categories</option>${Object.entries(CATEGORIES).map(([k, t]) => `<option value="${k}"${LF.c === k ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
       <div class="fld"><label for="lf-y">Year</label><select id="lf-y"><option value="">All years</option>${years.map(y => `<option value="${y}"${LF.y === y ? ' selected' : ''}>${y === 'undated' ? 'Undated' : y}</option>`).join('')}</select></div>
     </div>
-    <p class="summary"><span><b>${list.length}</b> record${list.length === 1 ? '' : 's'}</span><span>Total <b>${msum(total, 1)}</b></span><span class="hint">Reais and dollars are totalled separately, never converted.</span>${list.some(r => r.confidence === 'est') ? '<span class="hint">* estimated, not from a receipt</span>' : ''}</p>
+    <p class="summary"><span><b>${list.length}</b> record${list.length === 1 ? '' : 's'}</span>${S.user ? `<span>Total <b>${msum(total, 1)}</b></span><span class="hint">Reais and dollars are totalled separately, never converted.</span>` : `<span class="hint">Amounts are private. ${lockNote().replace('Sign in to edit', 'Sign in to see them')}</span>`}${list.some(r => r.confidence === 'est') ? '<span class="hint">* estimated, not from a receipt</span>' : ''}</p>
     ${list.length ? rowsHtml(list, true) : `<div class="empty"><h2>No records match</h2><p>Try a different search or clear the filters.</p><button class="btn" type="button" id="lf-clear">Clear filters</button></div>`}`;
 }
 function viewCosts() {
   const head = `<div class="head"><div><p class="eyebrow">What the collection has cost</p><h1>Costs</h1><p class="sub">Reais and dollars are shown separately, never converted.</p></div></div>`;
   if (window.live.state === 'loading') return head + '<div class="skel" style="height:240px"></div>';
+  if (!S.user) return head + `<div class="empty"><h2>Costs are private</h2><p>Purchase prices, values and service spend are only visible when you're signed in.</p><button class="btn" type="button" data-signin>Sign in</button></div>`;
   if (!S.vehicles.length) return head + `<div class="empty"><h2>Nothing to total yet</h2><p>Purchase prices and service spend for each vehicle will add up here.</p><a class="btn" href="#/cars">Go to cars</a></div>`;
   const rows = S.vehicles.map(v => ({ v, p: paid(v), s: spent(v.id), n: recsFor(v.id).length, last: recsFor(v.id).find(r => r.date)?.date }));
   const T = { p: addSums(...rows.map(r => r.p)), s: addSums(...rows.map(r => r.s)), n: rows.reduce((a, r) => a + r.n, 0) };
@@ -853,7 +871,7 @@ function openRecord(r) {
       ${r.hours != null ? `<dt>Engine hours</dt><dd class="mono">${(+r.hours).toLocaleString('en-US')} h</dd>` : ''}
       ${r.shop ? `<dt>Shop</dt><dd>${esc(r.shop)}</dd>` : ''}
       <dt>Category</dt><dd>${CATEGORIES[r.category]}</dd>
-      <dt>Amount</dt><dd class="mono">${money(r.amount, 1, r.currency)}</dd>
+      ${S.user ? `<dt>Amount</dt><dd class="mono">${money(r.amount, 1, r.currency)}</dd>` : ''}
       <dt>Source</dt><dd>${CONFIDENCE[r.confidence]}</dd>
     </dl>
     ${r.items ? `<h2 style="font-size:14px">Work done</h2><p class="notes" style="margin-bottom:20px">${esc(r.items)}</p>` : ''}
@@ -1012,8 +1030,10 @@ function viewDashboard() {
   const totalDriven = driven.reduce((a, x) => a + x.d, 0);
   const kpis = `<dl class="kpis">
     <div><dt>Vehicles</dt><dd>${owned.length}</dd><small>${cars} car${cars === 1 ? '' : 's'} · ${bikes} bike${bikes === 1 ? '' : 's'}</small></div>
-    <div><dt>Collection value</dt><dd class="sm">${msum(value).replace(' + ', '<br>')}</dd><small>${valued ? `${valued} estimated, ${owned.length - valued} at purchase price` : 'At purchase price — add estimates under Edit details'}</small></div>
-    <div><dt>Service in ${YEAR}</dt><dd class="sm">${msum(ySpend).replace(' + ', '<br>')}</dd><small>${yRecs.length} record${yRecs.length === 1 ? '' : 's'}</small></div>
+    ${S.user ? `<div><dt>Collection value</dt><dd class="sm">${msum(value).replace(' + ', '<br>')}</dd><small>${valued ? `${valued} estimated, ${owned.length - valued} at purchase price` : 'At purchase price — add estimates under Edit details'}</small></div>
+    <div><dt>Service in ${YEAR}</dt><dd class="sm">${msum(ySpend).replace(' + ', '<br>')}</dd><small>${yRecs.length} record${yRecs.length === 1 ? '' : 's'}</small></div>`
+    : `<div><dt>Collection value</dt><dd class="sm" style="color:var(--fg3)">Private</dd><small>${lockNote().replace('to edit', 'to see values')}</small></div>
+    <div><dt>Service in ${YEAR}</dt><dd>${yRecs.length}</dd><small>record${yRecs.length === 1 ? '' : 's'} logged this year</small></div>`}
     <div><dt>Driven in ${YEAR}</dt><dd>${Math.round(totalDriven).toLocaleString('en-US')} <span style="font-size:.6em;color:var(--fg3)">${distUnit}</span></dd><small>${driven.length} vehicle${driven.length === 1 ? '' : 's'} with readings this year</small></div>
   </dl>`;
   const shown = owned.filter(v => GF.k === 'all' || v.kind === GF.k);
@@ -1026,7 +1046,7 @@ function viewDashboard() {
     top.length ? hbars(top.map(x => ({ label: vshort(x.v) + (x.v.colour && owned.filter(y => y.make === x.v.make && y.model === x.v.model).length > 1 ? ' ' + x.v.colour : ''), value: x.d, href: '#/vehicle/' + x.v.id, tip: `${vname(x.v)}\n${Math.round(x.d).toLocaleString('en-US')} ${distUnit} in ${YEAR}` })), v => Math.round(v).toLocaleString('en-US') + ' ' + distUnit) : `<p class="none">No readings logged in ${YEAR} yet. Use Log reading on a vehicle's page.</p>`,
     [['Vehicle', `Distance (${distUnit})`], ...driven.map(x => [vname(x.v), Math.round(x.d).toLocaleString('en-US')])], unitSeg);
   const years = Array.from({ length: 8 }, (_, i) => YEAR - 7 + i);
-  const spendCards = ['BRL', 'USD'].filter(c => S.records.some(r => r.currency === c && +r.amount)).map(cur => {
+  const spendCards = !S.user ? [] : ['BRL', 'USD'].filter(c => S.records.some(r => r.currency === c && +r.amount)).map(cur => {
     const items = spendByYear(S.records, cur, years);
     return chartCard(`Service spend by year (${SYM[cur]})`, `${years[0]}–${YEAR}, all vehicles`, vbars(items, n => SYM[cur] + short(n)), [['Year', `Spend (${SYM[cur]})`, 'Records'], ...items.map(i => [String(i.year), money(i.value, 0, cur), String(i.n)])]);
   });
@@ -1044,7 +1064,7 @@ function viewDashboard() {
     ${att.length > 8 ? `<p class="hint" style="margin:12px 0 0">and ${att.length - 8} more</p>` : ''}</section>`;
   const recent = S.records.filter(r => r.date).slice(0, 6);
   const c5 = `<section class="cc"><div class="cc-h"><div><h3>Recent service</h3><p>Latest entries in the ledger</p></div><a class="btn sm" href="#/ledger">Ledger</a></div>
-    <div class="list">${recent.map(r => `<a class="li" href="#/vehicle/${r.vehicle_id}"><span style="min-width:0"><span class="t" style="display:block">${esc(r.title)}</span><span class="m" style="display:block">${esc(vname(vById(r.vehicle_id)))} · ${fdate(r.date)}</span></span><span class="r">${r.amount != null ? money(r.amount, 0, r.currency) : '—'}</span></a>`).join('')}</div></section>`;
+    <div class="list">${recent.map(r => `<a class="li" href="#/vehicle/${r.vehicle_id}"><span style="min-width:0"><span class="t" style="display:block">${esc(r.title)}</span><span class="m" style="display:block">${esc(vname(vById(r.vehicle_id)))} · ${fdate(r.date)}</span></span><span class="r">${r.amount != null ? money(r.amount, 0, r.currency) : (S.user ? '—' : '')}</span></a>`).join('')}</div></section>`;
   return head + kpis + garage + `<div class="charts">${c1}${c3}${spendCards.join('')}${c4}${c5}</div>`;
 }
 
@@ -1104,6 +1124,7 @@ function render() {
   document.querySelectorAll('.tab').forEach(t => t.toggleAttribute('aria-current', false) || (t.dataset.r === tab && t.setAttribute('aria-current', 'page')));
   $('#n-cars').textContent = S.vehicles.filter(v => v.kind === 'car').length || '';
   $('#n-bikes').textContent = S.vehicles.filter(v => v.kind === 'bike').length || '';
+  document.querySelector('.tab[data-r="costs"]').hidden = !S.user;
   const banner = window.live.state === 'offline' ? `<div class="banner" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span>Offline: ${esc(S.offline?.reason || 'the database couldn\'t be reached')}, so this is the copy saved${S.offline?.saved ? ' on ' + fdate(S.offline.saved) : ''}. Changes won't save until the connection is back. If you're on a work network, it may block the database; try your phone's data.</span><button class="btn sm" type="button" onclick="location.reload()">Try again</button></div>` : '';
   let html;
   if (a === 'dashboard') html = viewDashboard();
