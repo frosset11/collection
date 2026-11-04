@@ -1069,6 +1069,21 @@ function viewDashboard() {
 }
 
 /* ---------- readings ---------- */
+// The vehicle's current odometer/hours always follow its newest dated reading, so fixing or
+// deleting a wrong entry also corrects the figure shown on cards and the dashboard.
+async function syncCurrent(v) {
+  const rs = S.readings.filter(x => x.vehicle_id === v.id && x.date).sort((a, b) => b.date.localeCompare(a.date) || (+b.odometer || 0) - (+a.odometer || 0));
+  const lo = rs.find(x => x.odometer != null), lh = rs.find(x => x.hours != null);
+  if (!lo && !lh) return;
+  const upd = {};
+  if (lo) { upd.odometer = lo.unit === v.odometer_unit ? +lo.odometer : Math.round(conv(+lo.odometer, lo.unit, v.odometer_unit)); }
+  if (lh) upd.hours = +lh.hours;
+  upd.odometer_date = [lo?.date, lh?.date].filter(Boolean).sort().pop();
+  const cur = vById(v.id);
+  if (cur && cur.odometer == upd.odometer && cur.odometer_date === upd.odometer_date && (upd.hours === undefined || cur.hours == upd.hours)) return;
+  const u = await db.from('vehicles').update(upd).eq('id', v.id).select().single();
+  if (!u.error) S.vehicles = S.vehicles.map(x => x.id === v.id ? { ...x, ...u.data } : x);
+}
 function openReadingForm(v, r) {
   const isNew = !r;
   r = r || { date: new Date().toISOString().slice(0, 10), unit: v.odometer_unit || 'mi' };
@@ -1076,7 +1091,7 @@ function openReadingForm(v, r) {
   openPanel(isNew ? 'Log reading' : 'Edit reading', `
     <p class="hint" style="margin:0 0 18px">${esc(vname(v))}${v.odometer != null || v.hours != null ? ` · last recorded ${readingStr(v.odometer, v.odometer_unit, v.hours)}${v.odometer_date ? ' on ' + fdate(v.odometer_date) : ''}` : ''}</p>
     <form id="rd-form" novalidate>
-      ${field('date', 'Date of reading', 'date', r.date, { required: true })}
+      ${field('date', 'Date of reading', 'date', r.date, { required: isNew || !!r.date, help: !isNew && !r.date ? 'This reading has no date. Add one if you know it.' : '' })}
       ${dist ? `<div class="two">${field('odometer', 'Odometer', 'text', r.odometer != null ? num(r.odometer) : '', { inputmode: 'numeric', required: !hrs })}${field('unit', 'Unit', 'select', r.unit, { required: true, options: [['mi', 'Miles'], ['km', 'Kilometres']] })}</div>` : ''}
       ${hrs ? field('hours', 'Engine hours', 'text', r.hours ?? '', { inputmode: 'decimal', required: !dist }) : ''}
       ${field('notes', 'Note', 'text', r.notes, { ph: 'Before track day, after trip…' })}
@@ -1091,27 +1106,29 @@ function openReadingForm(v, r) {
     $('#del-yes').onclick = async () => {
       const { error } = await db.from('odometer_readings').delete().eq('id', r.id);
       if (error) return toast('Couldn\'t delete: ' + error.message, true);
-      S.readings = S.readings.filter(x => x.id !== r.id); closePanel(); toast('Reading deleted'); render();
+      S.readings = S.readings.filter(x => x.id !== r.id); await syncCurrent(v); closePanel(); toast('Reading deleted'); render();
     };
   };
   const rules = {
-    date: x => !x ? 'Enter the date of the reading.' : x > new Date().toISOString().slice(0, 10) ? 'The date can\'t be in the future.' : '',
+    date: x => !x ? (isNew || r.date ? 'Enter the date of the reading.' : '') : x > new Date().toISOString().slice(0, 10) ? 'The date can\'t be in the future.' : '',
   };
   if (dist) rules.odometer = (x, f) => x && !/^[\d,]+$/.test(x.trim()) ? 'Odometer should be a whole number, like 62,950.' : (!x && (!hrs || !f.elements.hours.value)) ? 'Enter the odometer reading.' : '';
   if (hrs) rules.hours = (x, f) => x && !/^[\d,]*\.?\d?$/.test(x.trim()) ? 'Engine hours should be a number, like 123.5.' : (!x && (!dist || !f.elements.odometer.value)) ? 'Enter the engine hours.' : '';
+  let warned = false;
   wireForm('#rd-form', rules, async f => {
-    const row = { vehicle_id: v.id, date: f.date, odometer: dist ? nInt(f.odometer) : null, unit: dist ? f.unit : (v.odometer_unit || 'mi'), hours: hrs ? nMoney(f.hours) : null, notes: nz((f.notes || '').trim()) };
+    if (!warned && dist && f.date && f.odometer) {
+      const o = conv(nInt(f.odometer), f.unit, v.odometer_unit);
+      const others = S.readings.filter(x => x.vehicle_id === v.id && x.id !== r.id && x.date && x.odometer != null).map(x => ({ d: x.date, o: conv(+x.odometer, x.unit, v.odometer_unit) }));
+      const later = others.filter(x => x.d < f.date && x.o > o + 0.5).sort((a, b) => b.o - a.o)[0];
+      const earlier = others.filter(x => x.d > f.date && x.o < o - 0.5).sort((a, b) => a.o - b.o)[0];
+      const clash = later ? `${num(Math.round(later.o))} ${v.odometer_unit} was already recorded on ${fdate(later.d)}, before this date` : earlier ? `only ${num(Math.round(earlier.o))} ${v.odometer_unit} was recorded later, on ${fdate(earlier.d)}` : '';
+      if (clash) { warned = true; throw new Error(`Check the date: ${clash}, so the odometer would go backwards. Fix the date or reading, or press Save again to keep it as is.`); }
+    }
+    const row = { vehicle_id: v.id, date: nz(f.date), odometer: dist ? nInt(f.odometer) : null, unit: dist ? f.unit : (v.odometer_unit || 'mi'), hours: hrs ? nMoney(f.hours) : null, notes: nz((f.notes || '').trim()) };
     const res = isNew ? await db.from('odometer_readings').insert(row).select().single() : await db.from('odometer_readings').update(row).eq('id', r.id).select().single();
     if (res.error) throw new Error('Couldn\'t save: ' + res.error.message);
     S.readings = (isNew ? [res.data, ...S.readings] : S.readings.map(x => x.id === r.id ? res.data : x)).sort((a, b) => (!a.date) - (!b.date) || (b.date || '').localeCompare(a.date || ''));
-    // keep the vehicle's current reading in step when this is the newest one
-    if (!v.odometer_date || row.date >= v.odometer_date) {
-      const upd = { odometer_date: row.date };
-      if (row.odometer != null) { upd.odometer = row.unit === v.odometer_unit ? row.odometer : Math.round(conv(row.odometer, row.unit, v.odometer_unit)); }
-      if (row.hours != null) upd.hours = row.hours;
-      const u = await db.from('vehicles').update(upd).eq('id', v.id).select().single();
-      if (!u.error) S.vehicles = S.vehicles.map(x => x.id === v.id ? u.data : x);
-    }
+    await syncCurrent(v);
     closePanel(); toast(isNew ? 'Reading saved' : 'Saved'); render();
   });
 }
