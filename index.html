@@ -207,6 +207,21 @@ body.locked .login{display:grid}
 .login-card .sub{margin:6px 0 24px}
 .linkbtn{background:none;border:0;padding:4px;color:var(--fg2);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:13.5px}
 .linkbtn:hover{color:var(--fg)}
+/* service to-do */
+.todo-wrap{margin:0 0 48px}
+.todo-list{border-top:1px solid var(--line)}
+.todo{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:16px;align-items:start;padding:14px 4px;border-bottom:1px solid var(--line)}
+.todo-st{padding-top:1px}
+.todo-v{font-weight:500;text-decoration:none}.todo-v:hover{text-decoration:underline}
+.todo .m{font-size:12.5px;color:var(--fg3);margin-top:2px}
+.todo-task{margin-top:8px;font-size:13.5px;color:var(--fg2)}
+.todo-task ul{margin:4px 0 0;padding-left:18px}.todo-task li{margin:1px 0}
+.todo-act{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.todo-nohist{margin-top:16px}
+.todo-nohist summary{cursor:pointer;color:var(--fg2);font-size:13.5px;padding:6px 0}
+.stc{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);white-space:nowrap}
+.stc i{width:7px;height:7px;border-radius:50%;background:var(--c)}
+@media (max-width:720px){.todo{grid-template-columns:minmax(0,1fr) auto;gap:8px 12px}.todo-st{grid-column:1/-1}.todo-act{grid-column:1/-1;justify-content:flex-start}}
 /* dashboard */
 :root{--bar:#c4c5c9}
 .dvr{display:grid;grid-template-columns:minmax(0,170px) minmax(0,1fr) 56px;gap:12px;align-items:center;padding:6px 0;text-decoration:none}
@@ -229,6 +244,7 @@ body.locked .login{display:grid}
 .garage-head h2{margin:0}
 .seg.sm{margin:0;padding:2px;display:inline-flex}
 .seg.sm button{height:28px;padding:0 12px;font-size:12.5px;flex:none}
+.seg.sm{max-width:100%;overflow-x:auto;scrollbar-width:none}.seg.sm::-webkit-scrollbar{display:none}
 .garage{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:24px 18px;margin-bottom:52px}
 .app{display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none;min-width:0}
 .app .ic{width:100%;aspect-ratio:1;border-radius:24%;overflow:hidden;background:var(--s2);border:1px solid var(--line);position:relative;transition:transform var(--t-med) var(--ease),border-color var(--t-med)}
@@ -329,7 +345,7 @@ body.locked .login{display:grid}
       <a class="tab" href="#/dashboard" data-r="dashboard">Dashboard</a>
       <a class="tab" href="#/cars" data-r="cars">Cars<span class="n" id="n-cars"></span></a>
       <a class="tab" href="#/bikes" data-r="bikes">Bikes<span class="n" id="n-bikes"></span></a>
-      <a class="tab" href="#/ledger" data-r="ledger">Service ledger</a>
+      <a class="tab" href="#/ledger" data-r="ledger">Service</a>
       <a class="tab" href="#/portfolio" data-r="portfolio">Portfolio</a>
     </nav>
     <div class="acct">
@@ -374,7 +390,7 @@ const STATUS = { owned:'Owned', project:'Project', stored:'Stored', sold:'Sold' 
 /* ---------- state ---------- */
 let db = null;
 try { db = window.supabase.createClient(SUPA_URL, SUPA_KEY); } catch (e) { db = null; }
-const S = { vehicles: [], records: [], readings: [], comps: [], fx: null, user: null, editor: false };
+const S = { vehicles: [], records: [], readings: [], comps: [], tasks: [], fx: null, user: null, editor: false };
 window.live = { state: 'loading', counts: {} };
 
 /* ---------- helpers ---------- */
@@ -446,23 +462,24 @@ async function load() {
     S.loadedFull = full;
     const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), 10000));
     const fx = Promise.race([loadFx(), new Promise(r => setTimeout(r, 4000))]);
-    const [v, r, o, mc] = await Promise.race([timeout, Promise.all([
+    const [v, r, o, mc, tk] = await Promise.race([timeout, Promise.all([
       db.from('vehicles').select(cols('vehicles')).order('sort_order').order('year', { ascending: false }),
       db.from('service_records').select(cols('service_records')).order('date', { ascending: false, nullsFirst: false }),
       db.from('odometer_readings').select(cols('odometer_readings')).order('date', { ascending: false, nullsFirst: false }),
-      db.from('market_comps').select('*').order('date', { ascending: false })
+      db.from('market_comps').select('*').order('date', { ascending: false }),
+      db.from('service_tasks').select('*').order('created_at', { ascending: false })
     ])]);
     await fx;
-    const err = v.error || r.error || o.error || mc.error;
+    const err = v.error || r.error || o.error || mc.error || tk.error;
     if (err && !load.retried && /jwt|token|401|PGRST30/i.test((err.code || '') + ' ' + (err.message || ''))) {
       load.retried = true; console.warn('Stored sign-in rejected; signing out on this device', err);
       await db.auth.signOut({ scope: 'local' }).catch(() => {}); toast('Your sign-in expired. Please sign in again.', true); return load();
     }
     if (err) throw err;
-    S.vehicles = v.data; S.records = sortRecs(r.data); S.readings = o.data; S.comps = mc.data || []; S.offline = null;
+    S.vehicles = v.data; S.records = sortRecs(r.data); S.readings = o.data; S.comps = mc.data || []; S.tasks = tk.data || []; S.offline = null;
     if (!full) stripPrivate();
     await signMedia();
-    try { localStorage.setItem('hc-cache', JSON.stringify({ saved: new Date().toISOString().slice(0, 10), vehicles: v.data, records: r.data, readings: o.data, comps: mc.data || [] })); } catch (e) {}
+    try { localStorage.setItem('hc-cache', JSON.stringify({ saved: new Date().toISOString().slice(0, 10), vehicles: v.data, records: r.data, readings: o.data, comps: mc.data || [], tasks: tk.data || [] })); } catch (e) {}
     setLive('live');
     setTimeout(refreshFipe, 50);
   } catch (e) { console.warn('Database unreachable, showing saved copy', e); await useSnapshot(/timed out/.test(e.message || '') ? 'the database didn\'t answer' : 'the database couldn\'t be reached'); return; }
@@ -472,7 +489,7 @@ async function useSnapshot(reason) {
   let snap = null;
   try { snap = JSON.parse(localStorage.getItem('hc-cache') || 'null'); } catch (e) {}
   snap = snap || { vehicles: [], records: [], readings: [] };
-  S.vehicles = snap.vehicles || []; S.records = sortRecs(snap.records || []); S.readings = snap.readings || []; S.comps = snap.comps || [];
+  S.vehicles = snap.vehicles || []; S.records = sortRecs(snap.records || []); S.readings = snap.readings || []; S.comps = snap.comps || []; S.tasks = snap.tasks || [];
   if (!S.fx) await loadFx().catch(() => {});
   S.offline = { reason, saved: snap.saved };
   await signMedia().catch(() => {});
@@ -747,7 +764,7 @@ function viewVehicle(id) {
     <div class="section"><h2>Ownership</h2>${dl(own)}</div>
     ${v.notes ? `<div class="section"><h2>Notes</h2><p class="notes">${esc(v.notes)}</p></div>` : ''}
     <div class="section">
-      <div class="section-head"><h2>Service history</h2>${recs.length ? `<span class="hint">${recs.length} record${recs.length === 1 ? '' : 's'}${S.user ? ' · ' + msum(sp, 1) : ''}</span>` : ''}</div>
+      <div class="section-head" style="flex-wrap:wrap"><h2>Service history</h2><span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${(st => stChip(st.key) + (S.editor ? `<button class="btn sm" type="button" data-task="${v.id}">${st.task ? 'Edit needs' : 'Add to To-Do'}</button><button class="btn sm primary" type="button" data-complete="${v.id}">Complete service</button>` : ''))(svcStatus(v))}${recs.length ? `<span class="hint">${recs.length} record${recs.length === 1 ? '' : 's'}${S.user ? ' · ' + msum(sp, 1) : ''}</span>` : ''}</span></div>
       ${recs.length ? rowsHtml(recs, false) : `<div class="empty"><h2>No service records yet</h2><p>Add work as it happens, or send invoices and they'll be entered here.</p>${S.editor ? `<button class="btn primary" type="button" data-add-r="${v.id}">${ICON.plus}Add service</button>` : ''}</div>`}
     </div>
     ${reads.length || S.editor ? `<div class="section">
@@ -791,9 +808,10 @@ function rowsHtml(recs, showVehicle) {
 const LF = { v: '', c: '', y: '', q: '' };
 function viewLedger() {
   const years = [...new Set(S.records.map(r => r.date ? r.date.slice(0, 4) : 'undated'))].sort().reverse();
-  const head = `<div class="head"><div><p class="eyebrow">Everything done, every vehicle</p><h1>Service ledger</h1></div>
-    ${S.editor ? `<button class="btn primary" type="button" data-add-r="">${ICON.plus}Add service</button>` : (S.user ? '' : lockNote())}</div>`;
-  if (window.live.state === 'loading') return head + '<div class="skel" style="height:240px"></div>';
+  const top = `<div class="head"><div><p class="eyebrow">What's coming up, and everything done</p><h1>Service</h1></div>
+    ${S.editor ? `<button class="btn primary" type="button" data-add-r="">${ICON.plus}Add record</button>` : (S.user ? '' : lockNote())}</div>`;
+  if (window.live.state === 'loading') return top + '<div class="skel" style="height:240px"></div>';
+  const head = top + todoSection() + `<div class="section-head"><h2>History</h2></div>`;
   if (!S.records.length) return head + `<div class="empty"><h2>No service records yet</h2><p>${S.vehicles.length ? 'Add work as it happens, or send invoices and they\'ll be entered here.' : 'Add a vehicle first, then its service records will appear here.'}</p>${S.editor ? (S.vehicles.length ? `<button class="btn primary" type="button" data-add-r="">${ICON.plus}Add service</button>` : `<a class="btn primary" href="#/cars">Go to cars</a>`) : `<button class="btn" type="button" data-signin>Sign in to add records</button>`}</div>`;
   const q = LF.q.trim().toLowerCase();
   const list = S.records.filter(r => (!LF.v || r.vehicle_id === LF.v) && (!LF.c || r.category === LF.c) && (!LF.y || (LF.y === 'undated' ? !r.date : (r.date || '').startsWith(LF.y))) &&
@@ -1113,15 +1131,12 @@ function viewDashboard() {
   const decItems = decKeys.map(k => ({ label: `'${String(k).slice(2)}s`, full: `${k}s`, value: dec[k].length, tip: `${k}s: ${dec[k].length} vehicle${dec[k].length === 1 ? '' : 's'}\n${dec[k].map(vshort).join(', ')}` }));
   const c3 = chartCard('The collection by decade', `Model year${dec.Unknown ? ` · ${dec.Unknown.length} without a year not shown` : ''}`, vbars(decItems, n => String(Math.round(n))),
     [['Decade', 'Vehicles'], ...decItems.map(i => [i.full, String(i.value)]), ...(dec.Unknown ? [['Year unknown', String(dec.Unknown.length)]] : [])]);
-  const now = Date.now();
-  const lastSvc = v => recsFor(v.id).find(r => r.date && r.category !== 'other' && r.category !== 'registration')?.date;
-  const att = owned.map(v => ({ v, d: lastSvc(v) })).filter(x => !x.d || now - Date.parse(x.d) > 365 * 864e5).sort((a, b) => (a.d || '').localeCompare(b.d || ''));
-  const ago = d => { const m = Math.round((now - Date.parse(d)) / (30.44 * 864e5)); return m >= 24 ? `${Math.floor(m / 12)} years ago` : `${m} months ago`; };
-  const c4 = `<section class="cc"><div class="cc-h"><div><h3>Needs attention</h3><p>${att.length} vehicle${att.length === 1 ? '' : 's'} with no service logged in the last 12 months</p></div></div>
-    <div class="list">${att.slice(0, 8).map(x => `<a class="li" href="#/vehicle/${x.v.id}"><span style="min-width:0"><span class="t" style="display:block">${esc(vname(x.v))}</span><span class="m" style="display:block">${x.d ? 'Last service ' + fdate(x.d) : 'No service logged'}</span></span><span class="r">${x.d ? ago(x.d) : '—'}</span></a>`).join('') || '<p class="none">Everything has been serviced in the last year.</p>'}</div>
-    ${att.length > 8 ? `<p class="hint" style="margin:12px 0 0">and ${att.length - 8} more</p>` : ''}</section>`;
+  const tdo = todoItems(), tc = k => tdo.filter(x => x.key === k).length;
+  const tshow = tdo.filter(x => !x.noHistory).slice(0, 7);
+  const c4 = `<section class="cc"><div class="cc-h"><div><h3>Service To-Do</h3><p>${tc('overdue')} overdue · ${tc('due')} due · ${tc('soon')} soon${tdo.some(x => x.noHistory) ? ` · ${tdo.filter(x => x.noHistory).length} with no history` : ''}</p></div><a class="btn sm" href="#/ledger">Open</a></div>
+    <div class="list">${tshow.map(x => `<a class="li" href="#/vehicle/${x.v.id}"><span style="min-width:0"><span class="t" style="display:block">${esc(vname(x.v))}</span><span class="m" style="display:block">${x.task ? esc(x.task.title) + ' · ' : ''}${x.last ? 'Last service ' + fdate(x.last) : ''}</span></span><span class="r">${stChip(x.key)}</span></a>`).join('') || '<p class="none">No services coming up.</p>'}</div></section>`;
   const recent = S.records.filter(r => r.date).slice(0, 6);
-  const c5 = `<section class="cc"><div class="cc-h"><div><h3>Recent service</h3><p>Latest entries in the ledger</p></div><a class="btn sm" href="#/ledger">Ledger</a></div>
+  const c5 = `<section class="cc"><div class="cc-h"><div><h3>Recent service</h3><p>Latest entries in the history</p></div><a class="btn sm" href="#/ledger">Service</a></div>
     <div class="list">${recent.map(r => `<a class="li" href="#/vehicle/${r.vehicle_id}"><span style="min-width:0"><span class="t" style="display:block">${esc(r.title)}</span><span class="m" style="display:block">${esc(vname(vById(r.vehicle_id)))} · ${fdate(r.date)}</span></span><span class="r">${r.amount != null ? money(r.amount, 0, r.currency) : (S.user ? '—' : '')}</span></a>`).join('')}</div></section>`;
   return head + kpis + garage + `<div class="charts">${c1}${c3}${spendCards.join('')}${c4}${c5}</div>`;
 }
@@ -1385,6 +1400,147 @@ function openFipeForm(v) {
   go();
 }
 
+/* ---------- service to-do ---------- */
+// Service clock: Soon from 9 months after the last service, Due at 12 months, Overdue after 14 months.
+const SVC_CATS = ['maintenance', 'repair', 'restoration', 'inspection'];
+const addMonths = (d, m) => { const x = new Date(d + 'T12:00:00Z'); const day = x.getUTCDate(); x.setUTCDate(1); x.setUTCMonth(x.getUTCMonth() + m); const last = new Date(Date.UTC(x.getUTCFullYear(), x.getUTCMonth() + 1, 0)).getUTCDate(); x.setUTCDate(Math.min(day, last)); return x.toISOString().slice(0, 10); };
+const SVC_ST = {
+  overdue: { label: 'Overdue', color: '#d03b3b', rank: 0 },
+  due: { label: 'Due', color: '#ec835a', rank: 1 },
+  soon: { label: 'Soon', color: '#fab219', rank: 2 },
+  planned: { label: 'Planned', color: '#8a8c92', rank: 3 },
+  ok: { label: 'Up to date', color: '#0ca30c', rank: 4 }
+};
+const TF = { k: 'all' };
+const lastService = v => recsFor(v.id).find(r => r.date && SVC_CATS.includes(r.category))?.date || null;
+const openTask = v => (S.tasks || []).find(t => t.vehicle_id === v.id && !t.done);
+function clockStatus(base) { // base = date the 12-month clock counts from
+  const t = today();
+  if (t >= addMonths(base, 14)) return 'overdue';
+  if (t >= addMonths(base, 12)) return 'due';
+  if (t >= addMonths(base, 9)) return 'soon';
+  return 'ok';
+}
+function svcStatus(v) {
+  const last = lastService(v), task = openTask(v);
+  let key = last ? clockStatus(last) : 'overdue';
+  let due = last ? addMonths(last, 12) : null;
+  if (task && task.due_date) { // a task with its own date follows that date instead
+    const k2 = clockStatus(addMonths(task.due_date, -12));
+    if (SVC_ST[k2].rank < SVC_ST[key].rank || key === 'ok') { key = k2; due = task.due_date; }
+    if (key === 'ok') key = 'planned';
+  } else if (task && key === 'ok') key = 'planned';
+  return { key, last, due, task, noHistory: !last };
+}
+const stChip = k => `<span class="stc" style="--c:${SVC_ST[k].color}"><i aria-hidden="true"></i>${SVC_ST[k].label}</span>`;
+function todoItems() {
+  return S.vehicles.filter(v => v.status !== 'sold').map(v => ({ v, ...svcStatus(v) })).filter(x => x.key !== 'ok')
+    .sort((a, b) => SVC_ST[a.key].rank - SVC_ST[b.key].rank || (a.noHistory - b.noHistory) || (a.due || '').localeCompare(b.due || ''));
+}
+const monthYear = d => { if (!d) return ''; const [y, m] = d.split('-'); return `${m}/${y}`; };
+function todoRow(x) {
+  const t = x.task, needs = (t?.needs || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const when = x.noHistory ? 'No service logged yet' : `Last service ${fdate(x.last)} · ${x.key === 'overdue' || x.key === 'due' ? 'was due' : 'due'} ${monthYear(x.due)}`;
+  return `<div class="todo">
+    <div class="todo-st">${stChip(x.key)}</div>
+    <div class="todo-main">
+      <a class="todo-v" href="#/vehicle/${x.v.id}">${esc(vname(x.v))}</a>
+      <div class="m">${esc(when)}${t?.due_date ? ` · planned for ${fdate(t.due_date)}` : ''}</div>
+      ${t ? `<div class="todo-task"><b>${esc(t.title)}</b>${needs.length ? `<ul>${needs.slice(0, 6).map(n => `<li>${esc(n)}</li>`).join('')}${needs.length > 6 ? `<li class="hint">+${needs.length - 6} more</li>` : ''}</ul>` : ''}</div>` : ''}
+    </div>
+    ${S.editor ? `<div class="todo-act"><button class="btn sm" type="button" data-task="${x.v.id}">${t ? 'Edit needs' : 'Add needs'}</button><button class="btn sm primary" type="button" data-complete="${x.v.id}">Complete</button></div>` : ''}
+  </div>`;
+}
+function todoSection() {
+  const items = todoItems();
+  const n = k => items.filter(x => x.key === k).length;
+  const shown = items.filter(x => TF.k === 'all' || x.key === TF.k);
+  const withHist = shown.filter(x => !x.noHistory), noHist = shown.filter(x => x.noHistory);
+  const filters = `<div class="seg sm" role="group" aria-label="Show">${[['all', `All ${items.length}`], ['overdue', `Overdue ${n('overdue')}`], ['due', `Due ${n('due')}`], ['soon', `Soon ${n('soon')}`], ...(n('planned') ? [['planned', `Planned ${n('planned')}`]] : [])].map(([k, l]) => `<button type="button" data-tf="${k}" aria-pressed="${TF.k === k}">${l}</button>`).join('')}</div>`;
+  return `<section class="todo-wrap">
+    <div class="section-head" style="flex-wrap:wrap"><h2>To-Do</h2><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${filters}${S.editor ? `<button class="btn sm" type="button" data-task="">${ICON.plus}Add to To-Do</button>` : ''}</div></div>
+    <p class="hint" style="margin:-4px 0 14px">Soon from 9 months after a vehicle's last service, Due at 12 months, Overdue after 14 months. Completing a service records it on the vehicle and resets its clock.</p>
+    ${withHist.length ? `<div class="todo-list">${withHist.map(todoRow).join('')}</div>` : (noHist.length ? '' : `<p class="none">${TF.k === 'all' ? 'Nothing due. Every vehicle has been serviced within the last 9 months.' : 'Nothing in this group.'}</p>`)}
+    ${noHist.length ? `<details class="todo-nohist"${withHist.length ? '' : ' open'}><summary>${noHist.length} vehicle${noHist.length === 1 ? '' : 's'} with no service history (counted as overdue)</summary><div class="todo-list">${noHist.map(todoRow).join('')}</div></details>` : ''}
+  </section>`;
+}
+function openTaskForm(v, task) {
+  const isNew = !task;
+  task = task || { title: 'Annual service', needs: '', due_date: null };
+  const pick = !v;
+  openPanel(isNew ? 'Add to To-Do' : 'Edit service needs', `
+    <form id="tk-form" novalidate>
+      ${pick ? field('vehicle_id', 'Vehicle', 'select', '', { required: true, options: [['', 'Choose a vehicle'], ...S.vehicles.filter(x => x.status !== 'sold').map(x => [x.id, vname(x)])] }) : `<p class="hint" style="margin:0 0 18px">${esc(vname(v))} · ${SVC_ST[svcStatus(v).key].label}</p>`}
+      ${field('title', 'Service', 'text', task.title, { required: true, ph: 'Annual service, brakes, tyres…' })}
+      ${field('needs', 'What it needs', 'textarea', task.needs, { help: 'One item per line, e.g. Oil and filter, Brake fluid, Check chain.' })}
+      ${field('due_date', 'Planned date', 'date', task.due_date, { help: 'Optional. Leave empty to follow the 12-month service clock.' })}
+      ${!isNew ? `<fieldset style="margin-top:8px"><legend>Remove</legend><div id="del-box"><button class="btn danger" type="button" id="del-tk">Remove from To-Do…</button></div></fieldset>` : ''}
+    </form>`,
+    `<button class="btn" type="button" id="cancel">Cancel</button><button class="btn primary" type="button" data-submit>${isNew ? 'Add to To-Do' : 'Save changes'}</button>`);
+  $('#cancel').onclick = closePanel;
+  if (!isNew) $('#del-tk').onclick = () => {
+    $('#del-box').innerHTML = `<div class="confirm"><p>Remove <b>${esc(task.title)}</b> for ${esc(vname(v))} from the To-Do? The vehicle stays on the list if its service clock says it's due.</p><button class="btn" type="button" id="del-no">Keep it</button> <button class="btn danger solid" type="button" id="del-yes">Remove task</button></div>`;
+    $('#del-no').onclick = () => openTaskForm(v, task);
+    $('#del-yes').onclick = async () => { const { error } = await db.from('service_tasks').delete().eq('id', task.id); if (error) return toast('Couldn\'t remove: ' + error.message, true); S.tasks = S.tasks.filter(x => x.id !== task.id); closePanel(); toast('Removed from To-Do'); render(); };
+  };
+  wireForm('#tk-form', {
+    ...(pick ? { vehicle_id: x => !x ? 'Choose which vehicle needs service.' : '' } : {}),
+    title: x => !x.trim() ? 'Name the service, like "Annual service".' : ''
+  }, async f => {
+    const vid = pick ? f.vehicle_id : v.id;
+    const existing = pick ? openTask(vById(vid)) : null;
+    const row = { vehicle_id: vid, title: f.title.trim(), needs: nz(f.needs.trim()), due_date: nz(f.due_date) };
+    const res = !isNew ? await db.from('service_tasks').update(row).eq('id', task.id).select().single()
+      : existing ? await db.from('service_tasks').update({ ...row, needs: [existing.needs, row.needs].filter(Boolean).join('\n') || null }).eq('id', existing.id).select().single()
+      : await db.from('service_tasks').insert(row).select().single();
+    if (res.error) throw new Error('Couldn\'t save: ' + res.error.message);
+    S.tasks = S.tasks.some(x => x.id === res.data.id) ? S.tasks.map(x => x.id === res.data.id ? res.data : x) : [res.data, ...S.tasks];
+    closePanel(); toast(existing ? 'Added to the existing To-Do for this vehicle' : 'Saved'); render();
+  });
+}
+function openCompleteForm(v) {
+  const task = openTask(v), dist = v.meter !== 'hours', hrs = v.meter !== 'distance';
+  openPanel('Complete service', `
+    <p class="hint" style="margin:0 0 18px">${esc(vname(v))}. This adds the work to the vehicle's service history${task ? ' and checks it off the To-Do' : ''}.</p>
+    <form id="cs-form" novalidate>
+      ${field('title', 'Service', 'text', task?.title || 'Annual service', { required: true })}
+      <div class="two">${field('date', 'Date completed', 'date', today(), { required: true })}${field('category', 'Category', 'select', 'maintenance', { required: true, options: Object.entries(CATEGORIES) })}</div>
+      <div class="two">${dist ? field('mileage', `Mileage (${v.odometer_unit})`, 'text', v.odometer != null ? num(v.odometer) : '', { inputmode: 'numeric', help: 'Also logged as a reading.' }) : ''}${hrs ? field('hours', 'Engine hours', 'text', v.hours ?? '', { inputmode: 'decimal' }) : ''}</div>
+      <div class="two">${field('amount', 'Cost', 'text', '', { inputmode: 'decimal' })}${field('currency', 'Currency', 'select', v.currency || 'USD', { required: true, options: Object.entries(CURRENCIES) })}</div>
+      ${field('shop', 'Shop or who did it', 'text', '', { ph: 'Dealer, independent shop, DIY…' })}
+      ${field('items', 'What was done', 'textarea', task?.needs || '', { help: 'One item per line. Edit to match what was actually done.' })}
+      ${field('invoice', 'Invoice', 'file', '', { accept: 'image/*,application/pdf', help: 'Photo or PDF.' })}
+      ${field('notes', 'Notes', 'textarea', '')}
+    </form>`,
+    `<button class="btn" type="button" id="cancel">Cancel</button><button class="btn primary" type="button" data-submit>Complete and record</button>`);
+  $('#cancel').onclick = closePanel;
+  wireForm('#cs-form', {
+    title: x => !x.trim() ? 'Describe the service in a few words.' : '',
+    date: x => !x ? 'Enter the date the work was done.' : x > today() ? 'The date can\'t be in the future.' : '',
+    ...(dist ? { mileage: intRule('Mileage') } : {}),
+    ...(hrs ? { hours: x => x && !/^[\d,]*\.?\d?$/.test(x.trim()) ? 'Engine hours should be a number, like 123.5.' : '' } : {}),
+    amount: moneyRule('Cost'),
+    invoice: fl => fl && fl[0] && !/^image\/|application\/pdf/.test(fl[0].type) ? 'Choose a photo or a PDF.' : ''
+  }, async f => {
+    const rec = { vehicle_id: v.id, title: f.title.trim(), date: f.date, category: f.category, mileage: dist ? nInt(f.mileage) : null, hours: hrs ? nMoney(f.hours) : null, mileage_approx: false,
+      amount: nMoney(f.amount), currency: f.currency, shop: nz(f.shop.trim()), items: nz(f.items.trim()), confidence: f.invoice && f.invoice[0] ? 'printed' : 'log', notes: nz(f.notes.trim()) };
+    if (f.invoice && f.invoice[0]) rec.invoice_url = await upload(await shrinkImage(f.invoice[0], 2400), `invoices/${v.id}`);
+    const res = await db.from('service_records').insert(rec).select().single();
+    if (res.error) throw new Error('Couldn\'t save the service: ' + res.error.message);
+    S.records = sortRecs([res.data, ...S.records]);
+    if (task) {
+      const u = await db.from('service_tasks').update({ done: true, done_at: f.date, record_id: res.data.id }).eq('id', task.id).select().single();
+      if (!u.error) S.tasks = S.tasks.map(x => x.id === task.id ? u.data : x);
+    }
+    if (rec.mileage != null || rec.hours != null) {
+      const rd = await db.from('odometer_readings').insert({ vehicle_id: v.id, date: f.date, odometer: rec.mileage, unit: v.odometer_unit || 'mi', hours: rec.hours, notes: 'At service: ' + rec.title }).select().single();
+      if (!rd.error) { S.readings = [rd.data, ...S.readings].sort((a, b) => (!a.date) - (!b.date) || (b.date || '').localeCompare(a.date || '')); await syncCurrent(v); }
+    }
+    await signMedia();
+    closePanel(); toast(`Service recorded on ${vshort(v)}`); render();
+  });
+}
+
 /* ---------- router ---------- */
 function current() { const h = location.hash.replace(/^#\/?/, '') || 'dashboard'; const [a, b] = h.split('/'); return { a, b }; }
 function render() {
@@ -1402,7 +1558,7 @@ function render() {
   else if (a === 'costs' || a === 'portfolio') html = viewPortfolio();
   else if (a === 'vehicle') html = viewVehicle(b);
   else html = viewList('car');
-  const titles = { dashboard: 'Dashboard', cars: 'Cars', bikes: 'Bikes', ledger: 'Service ledger', costs: 'Portfolio', portfolio: 'Portfolio' };
+  const titles = { dashboard: 'Dashboard', cars: 'Cars', bikes: 'Bikes', ledger: 'Service', costs: 'Portfolio', portfolio: 'Portfolio' };
   document.title = (a === 'vehicle' ? vname(vById(b)) : titles[a] || 'Dashboard') + ' · Home Collection';
   $('#view').innerHTML = banner + html;
   wireView();
@@ -1421,6 +1577,9 @@ function wireView() {
   V.querySelectorAll('[data-log]').forEach(b => b.onclick = () => openReadingForm(vById(b.dataset.log)));
   V.querySelectorAll('[data-read]').forEach(b => b.onclick = () => { const r = S.readings.find(x => x.id === b.dataset.read); openReadingForm(vById(r.vehicle_id), r); });
   V.querySelectorAll('.lc').forEach(wireLine);
+  V.querySelectorAll('[data-tf]').forEach(b => b.onclick = () => { TF.k = b.dataset.tf; render(); });
+  V.querySelectorAll('[data-task]').forEach(b => b.onclick = () => { const v = b.dataset.task ? vById(b.dataset.task) : null; openTaskForm(v, v ? openTask(v) : null); });
+  V.querySelectorAll('[data-complete]').forEach(b => b.onclick = () => openCompleteForm(vById(b.dataset.complete)));
   V.querySelectorAll('[data-pcur]').forEach(b => b.onclick = () => { PCUR = b.dataset.pcur; try { localStorage.setItem('hc-pcur', PCUR); } catch (e) {} render(); });
   V.querySelectorAll('[data-add-comp]').forEach(b => b.onclick = () => openCompForm(vById(b.dataset.addComp)));
   V.querySelectorAll('[data-comp]').forEach(b => b.onclick = () => { const c = S.comps.find(x => x.id === b.dataset.comp); if (S.editor) openCompForm(vById(c.vehicle_id), c); });
