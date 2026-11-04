@@ -1367,9 +1367,22 @@ async function runWebmotors(v, quiet) {
   render();
   return res;
 }
+// Turn a linked FIPE version into a Webmotors-friendly search: broad make + model words, the FIPE
+// model year, and the first distinctive version word (Competition, Abarth…) as a must-include filter.
+const FIPE_GENERIC = new Set('gasolina flex diesel alcool eletrico hibrido aut auto automatico mec manual turbo coupe cupe sedan hatch cabrio conversivel dualogic multiair tiptronic steptronic sport sportline plus pack serie series edition limited premium base cabine dupla simples gran turismo xdrive quattro ativo blindado'.split(' '));
+function fipeSearch(v) {
+  if (!v.fipe_label) return null;
+  const [modelPart, yearPart] = v.fipe_label.split(' · ');
+  const words = (modelPart || '').split(/\s+/).filter(Boolean);
+  const base = words[0] || v.model || '';
+  const distinct = words.slice(1).map(w => w.replace(/[^A-Za-zÀ-ÿ0-9]/g, '')).find(w => /^[A-Za-z]{1,3}\d{2,3}[A-Za-z]?$/.test(w) /* M50, M40i */ || (/^[A-Za-zÀ-ÿ]{4,}$/.test(w) && !FIPE_GENERIC.has(w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase())));
+  const yr = +((v.fipe_year || yearPart || '').match(/(19|20)\d{2}/) || [])[0] || null;
+  return { query: `${v.make} ${base}`.trim(), must: !distinct ? '' : /\d/.test(distinct) ? distinct.toUpperCase() : distinct.charAt(0).toUpperCase() + distinct.slice(1).toLowerCase(), from: yr, to: yr };
+}
 function openMarketForm(v) {
   openPanel('Webmotors search', `
     <p class="hint" style="margin:0 0 18px">${esc(vname(v))}. Best results: search on Webmotors with the right make, model and version, then paste the link from your browser's address bar.</p>
+    ${v.fipe_label ? `<div class="banner" style="background:var(--s2);border-color:var(--line2);color:var(--fg2);display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px"><span>FIPE: ${esc(v.fipe_label)}</span><button class="btn sm" type="button" id="ms-fipe">Fill from FIPE</button></div>` : ''}
     <form id="ms-form" novalidate>
       ${field('market_url', 'Webmotors search link', 'url', v.market_url, { ph: 'https://www.webmotors.com.br/carros/estoque/…', help: 'Recommended. When set, the search words below are ignored.' })}
       ${field('market_query', 'Or search words', 'text', v.market_query || [v.make, v.model].filter(Boolean).join(' '), { help: 'Keep it broad, like "BMW M2" or "Fiat 500" — long phrases return nothing.' })}
@@ -1382,6 +1395,9 @@ function openMarketForm(v) {
   const yr = x => x && (!/^\d{4}$/.test(x.trim())) ? 'Enter a 4-digit year, or leave it empty.' : '';
   let searchAfter = true;
   $('#ms-save').onclick = () => { searchAfter = false; $('#ms-form').requestSubmit(); };
+  const fillFipe = () => { const f = fipeSearch(v); if (!f) return; $('#f-market_url').value = ''; $('#f-market_query').value = f.query; $('#f-market_must').value = f.must; $('#f-market_year_from').value = f.from || ''; $('#f-market_year_to').value = f.to || ''; };
+  if ($('#ms-fipe')) $('#ms-fipe').onclick = () => { fillFipe(); toast('Filled from FIPE — check the words, then search'); };
+  if (v.fipe_label && !v.market_checked && !v.market_url && !v.market_query) fillFipe();
   wireForm('#ms-form', {
     market_url: x => x && !/^https:\/\/(www\.)?webmotors\.com\.br\//i.test(x.trim()) ? 'Paste a link that starts with https://www.webmotors.com.br/' : '',
     market_query: (x, f) => !x.trim() && !f.elements.market_url.value.trim() ? 'Paste a Webmotors link or enter search words.' : '',
