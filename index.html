@@ -401,7 +401,12 @@ async function load() {
       db.from('service_records').select('*').order('date', { ascending: false, nullsFirst: false }),
       db.from('odometer_readings').select('*').order('date', { ascending: false, nullsFirst: false })
     ])]);
-    if (v.error || r.error || o.error) throw (v.error || r.error || o.error);
+    const err = v.error || r.error || o.error;
+    if (err && !load.retried && /jwt|token|401|PGRST30/i.test((err.code || '') + ' ' + (err.message || ''))) {
+      load.retried = true; console.warn('Stored sign-in rejected; signing out on this device', err);
+      await db.auth.signOut({ scope: 'local' }).catch(() => {}); toast('Your sign-in expired. Please sign in again.', true); return load();
+    }
+    if (err) throw err;
     S.vehicles = v.data; S.records = sortRecs(r.data); S.readings = o.data; S.offline = null;
     try { localStorage.setItem('hc-cache', JSON.stringify({ saved: new Date().toISOString().slice(0, 10), vehicles: v.data, records: r.data, readings: o.data })); } catch (e) {}
     setLive('live');
@@ -425,10 +430,10 @@ function setLive(s) {
 }
 
 /* ---------- auth ---------- */
-async function refreshAuth() {
+async function refreshAuth(session) {
   if (!db) return;
-  const { data } = await db.auth.getSession();
-  S.user = data.session?.user || null;
+  if (session === undefined) session = (await db.auth.getSession()).data.session;
+  S.user = session?.user || null;
   S.editor = false;
   if (S.user) {
     const { data: ed } = await db.from('editors').select('email').eq('email', (S.user.email || '').toLowerCase());
@@ -1141,7 +1146,10 @@ $('#acct-btn').onclick = openAccount;
 
 render();
 load();
-if (db) { db.auth.onAuthStateChange(() => refreshAuth()); refreshAuth(); }
+// Never call Supabase from inside onAuthStateChange: the library holds its auth lock while the
+// callback runs, so a getSession() or query there waits on itself forever and every request stalls.
+// Deferring with setTimeout lets the lock release first. (INITIAL_SESSION fires on subscribe.)
+if (db) db.auth.onAuthStateChange((event, session) => { setTimeout(() => refreshAuth(session), 0); });
 </script>
 </body>
 </html>
