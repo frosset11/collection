@@ -756,7 +756,7 @@ function viewVehicle(id) {
           <div><dt>Owned</dt><dd>${owned != null ? (owned >= 365 ? (owned / 365).toFixed(1) + ' <small>yrs</small>' : owned + ' <small>days</small>') : '—'}</dd></div>
           <div><dt>Records</dt><dd>${recs.length}</dd></div>
         </dl>
-        <div class="actions">${S.editor ? `<button class="btn primary" type="button" data-add-r="${v.id}">${ICON.plus}Add service</button><button class="btn" type="button" data-log="${v.id}">${ICON.plus}Log reading</button><button class="btn" type="button" data-edit-v="${v.id}">Edit details</button>` : (S.user ? '' : lockNote())}</div>
+        <div class="actions">${S.editor ? `<button class="btn primary" type="button" data-scan="${v.id}">Scan invoice</button><button class="btn" type="button" data-add-r="${v.id}">${ICON.plus}Add service</button><button class="btn" type="button" data-log="${v.id}">${ICON.plus}Log reading</button><button class="btn" type="button" data-edit-v="${v.id}">Edit details</button>` : (S.user ? '' : lockNote())}</div>
       </div>
     </div>
     ${vehicleCharts(v)}
@@ -810,7 +810,7 @@ const LF = { v: '', c: '', y: '', q: '' };
 function viewLedger() {
   const years = [...new Set(S.records.map(r => r.date ? r.date.slice(0, 4) : 'undated'))].sort().reverse();
   const top = `<div class="head"><div><p class="eyebrow">What's coming up, and everything done</p><h1>Service</h1></div>
-    ${S.editor ? `<button class="btn primary" type="button" data-add-r="">${ICON.plus}Add record</button>` : (S.user ? '' : lockNote())}</div>`;
+    ${S.editor ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button" data-scan="">Scan invoice</button><button class="btn" type="button" data-add-r="">${ICON.plus}Add record</button></div>` : (S.user ? '' : lockNote())}</div>`;
   if (window.live.state === 'loading') return top + '<div class="skel" style="height:240px"></div>';
   const head = top + todoSection() + `<div class="section-head"><h2>History</h2></div>`;
   if (!S.records.length) return head + `<div class="empty"><h2>No service records yet</h2><p>${S.vehicles.length ? 'Add work as it happens, or send invoices and they\'ll be entered here.' : 'Add a vehicle first, then its service records will appear here.'}</p>${S.editor ? (S.vehicles.length ? `<button class="btn primary" type="button" data-add-r="">${ICON.plus}Add service</button>` : `<a class="btn primary" href="#/cars">Go to cars</a>`) : `<button class="btn" type="button" data-signin>Sign in to add records</button>`}</div>`;
@@ -958,11 +958,21 @@ function openRecord(r) {
   $('#panel-b').querySelectorAll('[data-close]').forEach(a => a.onclick = closePanel);
   if (S.editor) $('#r-edit').onclick = () => openRecordForm(r);
 }
-function openRecordForm(r, vehicleId) {
+function openRecordForm(r, vehicleId, scan) {
   const isNew = !r;
   if (!S.vehicles.length) { toast('Add a vehicle first', true); return; }
   r = r || { vehicle_id: vehicleId || '', date: new Date().toISOString().slice(0, 10), category: 'maintenance', confidence: 'printed', currency: vById(vehicleId)?.currency || 'USD' };
-  openPanel(isNew ? 'Add service' : 'Edit service', `
+  if (scan) { // pre-fill from the invoice the reader drafted
+    const d = scan.draft, v0 = vById(d.vehicle_id || vehicleId);
+    let mi = d.mileage != null ? Math.round(+d.mileage) : null;
+    if (mi != null && v0 && d.mileage_unit && d.mileage_unit !== v0.odometer_unit) mi = Math.round(conv(mi, d.mileage_unit, v0.odometer_unit));
+    Object.assign(r, { vehicle_id: v0 ? v0.id : '', title: d.title || '', date: d.date || r.date, category: d.category || 'maintenance', mileage: mi, hours: d.hours ?? null,
+      amount: d.amount ?? '', currency: d.currency || v0?.currency || 'USD', shop: d.shop || '', items: (d.items || []).join('\n'), confidence: 'printed',
+      notes: [d.invoice_number ? 'Invoice ' + d.invoice_number : '', d.plate ? 'Plate ' + d.plate : ''].filter(Boolean).join(' · ') });
+  }
+  const scanTask = scan ? (vId => vId && openTask(vById(vId)))(r.vehicle_id) : null;
+  openPanel(scan ? 'Check the drafted service' : isNew ? 'Add service' : 'Edit service', `
+    ${scan ? `<div class="banner" style="background:var(--s2);border-color:var(--line2);color:var(--fg2)">Drafted from your invoice. Check every field, then save.${r.vehicle_id ? '' : ' <b style="color:var(--fg)">Choose the vehicle</b>: the invoice didn\'t make it clear.'}${scan.draft.vehicle_match_reason && r.vehicle_id ? `<br><span class="hint">Vehicle: ${esc(scan.draft.vehicle_match_reason)}</span>` : ''}${(scan.draft.warnings || []).length ? `<ul style="margin:8px 0 0;padding-left:18px">${scan.draft.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}</div>` : ''}
     <form id="r-form" novalidate>
       ${field('vehicle_id', 'Vehicle', 'select', r.vehicle_id, { required: true, options: [['', 'Choose a vehicle'], ...S.vehicles.map(v => [v.id, vname(v)])] })}
       ${field('title', 'What was done', 'text', r.title, { required: true, ph: 'Oil and filter change' })}
@@ -974,13 +984,18 @@ function openRecordForm(r, vehicleId) {
       ${field('items', 'Parts and line items', 'textarea', r.items, { help: 'One per line works well.' })}
       ${field('confidence', 'Where the figures come from', 'select', r.confidence, { required: true, options: Object.entries(CONFIDENCE) })}
       ${media(r.invoice_url) ? `<p style="margin:0 0 8px"><a href="${esc(media(r.invoice_url))}" target="_blank" rel="noopener">Current invoice</a></p>` : ''}
-      ${field('invoice', r.invoice_url ? 'Replace invoice' : 'Invoice', 'file', '', { accept: 'image/*,application/pdf', help: 'Photo or PDF.' })}
+      ${scan ? `<p class="hint" style="margin:0 0 8px">The scanned invoice (${esc(scan.file.name)}) will be attached.</p>` : ''}
+      ${field('invoice', r.invoice_url || scan ? 'Replace invoice' : 'Invoice', 'file', '', { accept: 'image/*,application/pdf', help: 'Photo or PDF.' })}
+      ${scan ? `<label class="check" id="scan-log-wrap"${r.mileage != null ? '' : ' hidden'}><input type="checkbox" name="log_reading" checked> Also log the mileage as a reading</label>
+      <label class="check" id="scan-task-wrap"${scanTask ? '' : ' hidden'}><input type="checkbox" name="close_task" checked> <span id="scan-task-label">Check off the To-Do${scanTask ? ': ' + esc(scanTask.title) : ''}</span></label>` : ''}
       ${field('notes', 'Notes', 'textarea', r.notes)}
       ${!isNew ? `<fieldset style="margin-top:8px"><legend>Delete</legend><div id="del-box"><button class="btn danger" type="button" id="del-r">Delete this record…</button></div></fieldset>` : ''}
     </form>`,
-    `<button class="btn" type="button" id="cancel">Cancel</button><button class="btn primary" type="button" data-submit>${isNew ? 'Add record' : 'Save changes'}</button>`);
+    `<button class="btn" type="button" id="cancel">Cancel</button><button class="btn primary" type="button" data-submit>${scan ? 'Save to vehicle' : isNew ? 'Add record' : 'Save changes'}</button>`);
   $('#cancel').onclick = () => isNew ? closePanel() : openRecord(r);
-  $('#f-vehicle_id').onchange = e => { const v = vById(e.target.value); if (v && isNew) $('#f-currency').value = v.currency || 'USD'; };
+  $('#f-vehicle_id').onchange = e => { const v = vById(e.target.value); if (v && isNew && !scan) $('#f-currency').value = v.currency || 'USD';
+    if (scan) { const t = v && openTask(v); $('#scan-task-wrap').hidden = !t; if (t) $('#scan-task-label').textContent = 'Check off the To-Do: ' + t.title; } };
+  if (scan) $('#f-mileage').addEventListener('input', e => { $('#scan-log-wrap').hidden = !e.target.value.trim(); });
   if (!isNew) $('#del-r').onclick = () => {
     $('#del-box').innerHTML = `<div class="confirm"><p>Delete <b>${esc(r.title)}</b>${r.date ? ' from ' + fdate(r.date) : ''}? This can't be undone.</p>
       <button class="btn" type="button" id="del-no">Keep it</button> <button class="btn danger solid" type="button" id="del-yes">Delete record</button></div>`;
@@ -1004,12 +1019,58 @@ function openRecordForm(r, vehicleId) {
       amount: nMoney(f.amount), shop: nz(f.shop.trim()), items: nz(f.items.trim()), confidence: f.confidence, notes: nz(f.notes.trim())
     };
     if (f.invoice && f.invoice[0]) row.invoice_url = await upload(await shrinkImage(f.invoice[0], 2400), `invoices/${f.vehicle_id}`);
+    else if (scan) row.invoice_url = await upload(scan.file, `invoices/${f.vehicle_id}`);
     const res = isNew ? await db.from('service_records').insert(row).select().single() : await db.from('service_records').update(row).eq('id', r.id).select().single();
     if (res.error) throw new Error('Couldn\'t save: ' + res.error.message);
     S.records = sortRecs(isNew ? [res.data, ...S.records] : S.records.map(x => x.id === r.id ? res.data : x));
+    if (scan) {
+      const v = vById(f.vehicle_id);
+      if (f.log_reading && (row.mileage != null || row.hours != null) && row.date) {
+        const rd = await db.from('odometer_readings').insert({ vehicle_id: v.id, date: row.date, odometer: row.mileage, unit: v.odometer_unit || 'mi', hours: row.hours, notes: 'From invoice: ' + row.title }).select().single();
+        if (!rd.error) { S.readings = [rd.data, ...S.readings].sort((a, b) => (!a.date) - (!b.date) || (b.date || '').localeCompare(a.date || '')); await syncCurrent(v); }
+      }
+      const t = openTask(v);
+      if (f.close_task && t) { const u = await db.from('service_tasks').update({ done: true, done_at: row.date || today(), record_id: res.data.id }).eq('id', t.id).select().single(); if (!u.error) S.tasks = S.tasks.map(x => x.id === t.id ? u.data : x); }
+    }
     await signMedia();
-    closePanel(); toast(isNew ? 'Record added' : 'Saved'); render();
+    closePanel(); toast(scan ? `Saved to ${vshort(vById(f.vehicle_id))}` : isNew ? 'Record added' : 'Saved'); render();
   });
+}
+
+/* ---------- scan an invoice ---------- */
+const fileToB64 = f => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = () => no(new Error('Couldn\'t read that file.')); r.readAsDataURL(f); });
+function openScan(vehicleId) {
+  const v = vehicleId ? vById(vehicleId) : null;
+  openPanel('Scan an invoice', `
+    <p class="hint" style="margin:0 0 18px">${v ? esc(vname(v)) + '. ' : ''}Take a photo of the invoice, or choose a photo or PDF. It's read automatically and drafted as a service entry for you to check before saving.</p>
+    <div id="scan-pick" style="display:grid;gap:10px">
+      <label class="btn primary" style="height:48px">Take a photo<input id="scan-cam" type="file" accept="image/*" capture="environment" class="vh"></label>
+      <label class="btn" style="height:48px">Choose a photo or PDF<input id="scan-file" type="file" accept="image/*,application/pdf" class="vh"></label>
+      <p class="hint" style="margin:6px 0 0">Tips: flat, well lit, the whole page in frame. Totals, date and mileage must be readable.</p>
+    </div>
+    <div id="scan-busy" hidden><div class="skel" style="height:14px;width:60%;margin-bottom:12px"></div><div class="skel" style="height:14px;width:85%;margin-bottom:12px"></div><div class="skel" style="height:14px;width:40%"></div><p class="hint" style="margin:18px 0 0" id="scan-msg">Reading the invoice… this takes 10–20 seconds.</p></div>
+    <div id="scan-err"></div>`, '');
+  const go = async file => {
+    if (!file) return;
+    $('#scan-err').innerHTML = '';
+    const isPdf = file.type === 'application/pdf';
+    if (!isPdf && !/^image\//.test(file.type)) { $('#scan-err').innerHTML = '<div class="form-err">Choose a photo or a PDF.</div>'; return; }
+    if (isPdf && file.size > 5e6) { $('#scan-err').innerHTML = '<div class="form-err">That PDF is over 5 MB. Export a smaller one or take a photo instead.</div>'; return; }
+    $('#scan-pick').hidden = true; $('#scan-busy').hidden = false;
+    try {
+      const send = isPdf ? file : await shrinkImage(file, 2000);
+      const media_type = isPdf ? 'application/pdf' : (send.type || 'image/jpeg');
+      const { data, error } = await db.functions.invoke('scan-invoice', { body: { data: await fileToB64(send), media_type, vehicle_id: vehicleId || null } });
+      let res = data; if (error) { try { res = await error.context.json(); } catch (e) { res = { message: 'The invoice reader couldn\'t be reached. Check your connection and try again.' }; } }
+      if (!res || !res.ok) throw new Error(res?.message || 'Couldn\'t read that invoice.');
+      openRecordForm(null, vehicleId, { draft: res.draft, file: send });
+    } catch (e) {
+      $('#scan-busy').hidden = true; $('#scan-pick').hidden = false;
+      $('#scan-err').innerHTML = `<div class="form-err" role="alert" style="margin-top:16px">${esc(e.message)}</div>`;
+    }
+  };
+  $('#scan-cam').onchange = e => go(e.target.files[0]);
+  $('#scan-file').onchange = e => go(e.target.files[0]);
 }
 
 /* ---------- charts ---------- */
@@ -1751,6 +1812,7 @@ function wireView() {
     refreshAllBat(list, 'BaT');
   });
   V.querySelectorAll('[data-wm-all]').forEach(b => b.onclick = () => { const list = S.vehicles.filter(v => v.status !== 'sold' && (v.market_checked || (v.currency === 'BRL' && v.purchase_price != null))); if (!list.length) return toast('No Brazilian vehicles to search.', true); refreshAllWebmotors(list, 'Webmotors'); });
+  V.querySelectorAll('[data-scan]').forEach(b => b.onclick = () => openScan(b.dataset.scan || null));
   V.querySelectorAll('[data-tf]').forEach(b => b.onclick = () => { TF.k = b.dataset.tf; render(); });
   V.querySelectorAll('[data-task]').forEach(b => b.onclick = () => { const v = b.dataset.task ? vById(b.dataset.task) : null; openTaskForm(v, v ? openTask(v) : null); });
   V.querySelectorAll('[data-complete]').forEach(b => b.onclick = () => openCompleteForm(vById(b.dataset.complete)));
